@@ -15,7 +15,7 @@ namespace DDM_Impl
         public SkinnedMeshRenderer SkinRenderer;
         public Image DebugImage;
         public float Lambda;
-        public int iterations=1;
+        public int iterations = 1;
         // Start is called before the first frame update
         void Start()
         {
@@ -34,6 +34,8 @@ namespace DDM_Impl
             DDMMesh = new SkinnedGeometry(Mesh.vertexCount);
             CalcuatePrecomputes();
         }
+        Matrix<float> u_;
+        Matrix<float> v_;
         Matrix<float> normalizedLaplacian;
         public void CalcuatePrecomputes()
         {
@@ -56,21 +58,26 @@ namespace DDM_Impl
             }
             var bw = Mesh.boneWeights;
             var vert = Mesh.vertices;
+            Debug.Log($"(L:{B.RowCount},{B.ColumnCount}),(Mesh.vert:{vert.Length})");
+            u_ = Matrix<float>.Build.Sparse(vert.Length, 4);
+            v_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             Vector3[] vs = new Vector3[vert.Length];
             Matrix<float>[] vs_mat = new Matrix<float>[vert.Length];
             Matrix<float>[] Smooth_vs_mat = new Matrix<float>[vert.Length];
+            Matrix<float> _Smooth_vs_mat = Matrix<float>.Build.Sparse(vert.Length, 4);
             Matrix<float>[] us = new Matrix<float>[vert.Length];
             Matrix<float>[] Smooth_us = new Matrix<float>[vert.Length];
+            Matrix<float> _Smooth_us = Matrix<float>.Build.Sparse(vert.Length, 4);
             for (int i = 0; i < bw.Length; i++)
             {
                 var bw_i = bw[i];
                 var vert_i = vert[i];
 
-                Matrix<float> u = Matrix<float>.Build.DenseOfArray(new float[,] {
-                    { vert_i.x },
-                    { vert_i.y },
-                    { vert_i.z },
-                    { 1 }
+                Matrix<float> u = Matrix<float>.Build.DenseOfColumnArrays(new float[] {
+vert_i.x,
+vert_i.y,
+vert_i.z,
+1
                 });
                 us[i] = u;
                 Matrix<float> v;
@@ -81,20 +88,32 @@ namespace DDM_Impl
                     v = v.Add(M[bw_i.boneIndex3].Multiply(bw_i.weight3).Multiply(u));
                 }
                 vs_mat[i] = v;
-                vs[i]=new Vector3(v[0, 0], v[1, 0], v[2,0]);
+                u_.SetRow(i, u.Column(0));
+                v_.SetRow(i, v.Column(0));
+                vs[i] = new Vector3(v[0, 0], v[1, 0], v[2, 0]);
             }
-
-            for (int i = 0; i < vert.Length; i++)
-            {
-                Smooth_vs_mat[i] = IterativeCalcB(vs_mat[i], iterations);
-                Smooth_us[i] = IterativeCalcB(us[i], iterations);
-            }
+            _Smooth_vs_mat = IterativeCalcB(v_, iterations);
+            _Smooth_us = IterativeCalcB(u_, iterations);
+            VisualizeMatrix(_Smooth_us);
+            //for (int i = 0; i < vert.Length; i++)
+            //{
+            //    Smooth_vs_mat[i] = IterativeCalcB(v_, iterations);
+            //    Smooth_us[i] = IterativeCalcB(u_, iterations);
+            //}
+        }
+        void VisualizeMatrix(Matrix<float> m)
+        {
+            Debug.Log(m);
+            var t = DebugUtilities.FromMatrix(m.ToArray(), m.RowCount, m.ColumnCount, 0, 10f);
+            var s = Sprite.Create(t, new Rect(0, 0, m.RowCount, m.ColumnCount), new Vector2(.5f, .5f));
+            DebugImage.sprite = s;
+            DebugImage.rectTransform.sizeDelta = new Vector2(m.RowCount, m.ColumnCount);
         }
         Matrix<float> A;
         Matrix<float> B;
         public void CalcAMatrix(float Lambda)
         {
-            A=Matrix<float>.Build.DiagonalIdentity(normalizedLaplacian.RowCount, normalizedLaplacian.ColumnCount).Subtract(normalizedLaplacian.Multiply(Lambda));
+            A = Matrix<float>.Build.DiagonalIdentity(normalizedLaplacian.RowCount, normalizedLaplacian.ColumnCount).Subtract(normalizedLaplacian.Multiply(Lambda));
         }
         public void CalcBMatrix(float Lambda)
         {
@@ -104,7 +123,7 @@ namespace DDM_Impl
         {
             if (it == 0) return m;
             it -= 1;
-            return IterativeCalcA(m, it)*A;
+            return IterativeCalcA(m, it) * A;
         }
         public Matrix<float> IterativeCalcB(Matrix<float> m, int iteration)
         {
@@ -125,9 +144,6 @@ namespace DDM_Impl
             var DL_m_I = DL_m.Inverse();
             normalizedLaplacian = LaplacianMatrix.Multiply(DL_m_I);
 
-            var t = DebugUtilities.FromMatrix(normalizedLaplacian.ToArray(), _AdjacencyMatrix.n, _AdjacencyMatrix.n, 3, 0.2f);
-            var s = Sprite.Create(t, new Rect(0, 0, _AdjacencyMatrix.n, _AdjacencyMatrix.n), new Vector2(.5f, .5f));
-            DebugImage.sprite = s;
         }
         // Update is called once per frame
         void Update()
