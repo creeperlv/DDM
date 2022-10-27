@@ -119,6 +119,14 @@ vert_i.z,
         {
             B = Matrix<float>.Build.DiagonalIdentity(normalizedLaplacian.RowCount, normalizedLaplacian.ColumnCount).Add(normalizedLaplacian.Multiply(Lambda));
         }
+        public void CalcDelta()
+        {
+
+        }
+        public virtual void OnFrameImplementation()
+        {
+
+        }
         public Matrix<float> IterativeCalcA(Matrix<float> m, int it)
         {
             if (it == 0) return m;
