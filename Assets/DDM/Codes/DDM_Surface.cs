@@ -37,11 +37,17 @@ namespace DDM_Impl
         Matrix<float> u_;
         Matrix<float> v_;
         Matrix<float> normalizedLaplacian;
+        Matrix<float> _Smooth_vs_mat;
+        Matrix<float> _Smooth_us;
         public void CalcuatePrecomputes()
         {
             CalcuateLaplace();
             CalcBMatrix(Lambda);
             BuildSkinnedGeometry();
+        }
+        public void BuildOriginalMeshMatrix()
+        {
+
         }
         public void BuildSkinnedGeometry()
         {
@@ -58,27 +64,19 @@ namespace DDM_Impl
             }
             var bw = Mesh.boneWeights;
             var vert = Mesh.vertices;
-            Debug.Log($"(L:{B.RowCount},{B.ColumnCount}),(Mesh.vert:{vert.Length})");
             u_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             v_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             Vector3[] vs = new Vector3[vert.Length];
             Matrix<float>[] vs_mat = new Matrix<float>[vert.Length];
-            Matrix<float>[] Smooth_vs_mat = new Matrix<float>[vert.Length];
-            Matrix<float> _Smooth_vs_mat = Matrix<float>.Build.Sparse(vert.Length, 4);
+            _Smooth_vs_mat = Matrix<float>.Build.Sparse(vert.Length, 4);
             Matrix<float>[] us = new Matrix<float>[vert.Length];
-            Matrix<float>[] Smooth_us = new Matrix<float>[vert.Length];
-            Matrix<float> _Smooth_us = Matrix<float>.Build.Sparse(vert.Length, 4);
+            _Smooth_us = Matrix<float>.Build.Sparse(vert.Length, 4);
             for (int i = 0; i < bw.Length; i++)
             {
                 var bw_i = bw[i];
                 var vert_i = vert[i];
 
-                Matrix<float> u = Matrix<float>.Build.DenseOfColumnArrays(new float[] {
-vert_i.x,
-vert_i.y,
-vert_i.z,
-1
-                });
+                Matrix<float> u = Matrix<float>.Build.DenseOfColumnArrays(new float[] { vert_i.x, vert_i.y, vert_i.z, 1 });
                 us[i] = u;
                 Matrix<float> v;
                 {
