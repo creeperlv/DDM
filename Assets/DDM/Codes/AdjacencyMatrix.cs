@@ -1,5 +1,6 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace DDM_Impl
 {
@@ -27,26 +28,6 @@ namespace DDM_Impl
             return degMatrix;
         }
     }
-    public static class MatrixUtils
-    {
-        public static float[,] Diagonal(int[,] matrix, int n)
-        {
-            float[,] data = new float[n, n];
-            for (int i = 0; i < n; i++)
-            {
-                data[i, i] = matrix[i, i];
-            }
-            return data;
-        }
-        public static Matrix<float> ToMatrix (this Matrix4x4 m)
-        {
-            return Matrix<float>.Build.DenseOfArray(new float[,] { { m[0, 0], m[0, 1], m[0, 2], m[0, 3] },
-                { m[1, 0], m[1, 1], m[1, 2], m[1, 3] } ,
-                { m[2, 0], m[2, 1], m[2, 2], m[2, 3] },
-                { m[3, 0], m[3, 1], m[3, 2], m[3, 3] }});
-            
-        }
-    }
     [System.Serializable]
     public class AdjacencyMatrix
     {
@@ -63,13 +44,52 @@ namespace DDM_Impl
                 var i_1 = triangles[i + 1];
                 var i_2 = triangles[i + 2];
                 {
-                    data[i_0, i_1] = 1;
-                    data[i_0, i_2] = 1;
-                    data[i_1, i_2] = 1;
+                    data[i_0, i_1] =1;
+                    data[i_0, i_2] =1;
+                    data[i_1, i_2] =1;
                 }
             }
             AdjacencyMatrix adjacencyMatrix = new AdjacencyMatrix { n = vertices.Length, data = data };
             return adjacencyMatrix;
+        }
+        public static int[,] BuildAdjacencyMatrix(Vector3[] v, int[] t, int maxNeighbors)
+        {
+            var adj = new int[v.Length, maxNeighbors];
+            for (int i = 0; i < adj.GetLength(0); ++i)
+                for (int j = 0; j < adj.GetLength(1); ++j)
+                    adj[i, j] = -1;
+
+                for (int tri = 0; tri < t.Length; tri = tri + 3)
+                {
+                    AddEdgeToAdjacencyMatrixDirect(ref adj, t[tri], t[tri + 1]);
+                    AddEdgeToAdjacencyMatrixDirect(ref adj, t[tri], t[tri + 2]);
+                    AddEdgeToAdjacencyMatrixDirect(ref adj, t[tri + 1], t[tri + 2]);
+                }
+            
+         
+
+            return adj;
+        }
+        private static void AddEdgeToAdjacencyMatrixDirect(ref int[,] adjacencyMatrix, int v0, int v1)
+        {
+            AddVertexToAdjacencyMatrix(ref adjacencyMatrix, v0, v1);
+            AddVertexToAdjacencyMatrix(ref adjacencyMatrix, v1, v0);
+        }
+
+        private static void AddVertexToAdjacencyMatrix(ref int[,] adjacencyMatrix, int from, int to)
+        {
+            var maxNeighbors = adjacencyMatrix.GetLength(1);
+            for (int i = 0; i < maxNeighbors; i++)
+            {
+                if (adjacencyMatrix[from, i] == to)
+                    break;
+
+                if (adjacencyMatrix[from, i] == -1)
+                {
+                    adjacencyMatrix[from, i] = to;
+                    break;
+                }
+            }
         }
         public static implicit operator float[,](AdjacencyMatrix matrix)
         {
