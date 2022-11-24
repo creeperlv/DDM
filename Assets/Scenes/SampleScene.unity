@@ -3389,7 +3389,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TargetSMR: {fileID: 1692425713}
-  Lambda: 0.9
+  Lambda: 2
   iterations: 5
   Root: {fileID: 1836784121}
 --- !u!33 &1692425716
