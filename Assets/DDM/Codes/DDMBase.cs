@@ -1,5 +1,6 @@
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Single;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
@@ -43,10 +44,16 @@ namespace DDM_Impl
             Bones = TargetSMR.bones;
             boneM = new Matrix4x4[Bones.Length];
             boneM_ = new Matrix<float>[Bones.Length];
+            for (int i = 0; i < Bones.Length; i++)
+            {
+                boneM_[i] = Matrix<float>.Build.Dense(4, 4);
+            }
             Precompute();
         }
 
         Matrix<float> B;
+        Matrix<float> A;
+        Matrix<float> A_p;
         Matrix<float> B_p;
         Matrix<float>[,] Psis;
         void Precompute()
@@ -61,34 +68,57 @@ namespace DDM_Impl
         {
             //Debug.Log($"u_:Row->{u_.RowCount},Column->{u_.ColumnCount}");
             Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+            var _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
             for (int i = 0; i < CurrentMesh.vertices.Length; i++)
             {
                 // i : i;
-                Matrix<float> Psi_i_0 = Matrix<float>.Build.Sparse(4, 4, 0);
-                Matrix<float> Psi_i_1 = Matrix<float>.Build.Sparse(4, 4, 0);
-                Matrix<float> Psi_i_2 = Matrix<float>.Build.Sparse(4, 4, 0);
-                Matrix<float> Psi_i_3 = Matrix<float>.Build.Sparse(4, 4, 0);
-                for (int k = 0; k < CurrentMesh.vertices.Length; k++)
+                Matrix<float> Psi_i_0;
+                Matrix<float> Psi_i_1;
+                Matrix<float> Psi_i_2;
+                Matrix<float> Psi_i_3;
+                Psi_i_0 = Matrix<float>.Build.Dense(4, 4, 0);
+                Psi_i_1 = Matrix<float>.Build.Dense(4, 4, 0);
+                Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
+                Psi_i_3 = Matrix<float>.Build.Dense(4, 4, 0);
+                //for (int k = 0; k < CurrentMesh.vertices.Length; k++)
                 {
-                    var wei = CurrentMesh.boneWeights[k];
+                    var wei = CurrentMesh.boneWeights[i];
                     //var v=Vertices[k];
                     //var u_k = Matrix<float>.Build.DenseOfColumns(new float[1][]{ new float[4] { v.x, v.y, v.z, 1 } });
-                    var u_k = u_.Row(k).ToColumnMatrix();
-                    var u_k_calced = u_k * u_k.Transpose();
-                    if (B[k, i] == 0f)
+                    //var u_k = u_.Row(k).ToColumnMatrix();
+                    //var u_k = u__[k];
+                    var u_col = u_.Row(i);
+                    //var u_k_calced = u_k * u_k.Transpose();
+                    var u_k_calced = u_col.OuterProduct(u_col);
+                    //var AorB = B_p[i, i];
+
+                    //float[] v = new float[] { u_[k, 0], u_[k, 1], u_[k, 2], 1.0f };
+                    //DenseVector rw = new DenseVector(v);
+
+                    //var hh=rw.OuterProduct(rw);
+
+                    //if (AorB != 0f)
                     {
                         Psi_i_0 += (wei.weight0 * u_k_calced);// [0, 0];
                         Psi_i_1 += (wei.weight1 * u_k_calced);// [0, 0];
                         Psi_i_2 += (wei.weight2 * u_k_calced);// [0, 0];
                         Psi_i_3 += (wei.weight3 * u_k_calced);// [0, 0];
 
+                        //Psi_i_0 += (AorB * wei.weight0 * u_k_calced);// [0, 0];
+                        //Psi_i_1 += (AorB * wei.weight1 * u_k_calced);// [0, 0];
+                        //Psi_i_2 += (AorB * wei.weight2 * u_k_calced);// [0, 0];
+                        //Psi_i_3 += (AorB * wei.weight3 * u_k_calced);// [0, 0];
                     }
-                    else
+                    //else
                     {
-                        Psi_i_0 += IterativeSolveAx_B(wei.weight0 * u_k_calced, iterations, B[k, i]);
-                        Psi_i_1 += IterativeSolveAx_B(wei.weight1 * u_k_calced, iterations, B[k, i]);
-                        Psi_i_2 += IterativeSolveAx_B(wei.weight2 * u_k_calced, iterations, B[k, i]);
-                        Psi_i_3 += IterativeSolveAx_B(wei.weight3 * u_k_calced, iterations, B[k, i]);
+                        //Psi_i_0 += (AorB * wei.weight0 * u_k_calced);// [0, 0];
+                        //Psi_i_1 += (AorB * wei.weight1 * u_k_calced);// [0, 0];
+                        //Psi_i_2 += (AorB * wei.weight2 * u_k_calced);// [0, 0];
+                        //Psi_i_3 += (AorB * wei.weight3 * u_k_calced);// [0, 0];
+                        //Psi_i_0 += IterativeSolveAx_B(wei.weight0 * u_k_calced, iterations, B[k, i]);
+                        //Psi_i_1 += IterativeSolveAx_B(wei.weight1 * u_k_calced, iterations, B[k, i]);
+                        //Psi_i_2 += IterativeSolveAx_B(wei.weight2 * u_k_calced, iterations, B[k, i]);
+                        //Psi_i_3 += IterativeSolveAx_B(wei.weight3 * u_k_calced, iterations, B[k, i]);
 
                     }
                 }
@@ -96,9 +126,52 @@ namespace DDM_Impl
                 Psis[i, 1] = Psi_i_1;
                 Psis[i, 2] = Psi_i_2;
                 Psis[i, 3] = Psi_i_3;
+                //_Psis[i, 0] = Psi_i_0;
+                //_Psis[i, 1] = Psi_i_1;
+                //_Psis[i, 2] = Psi_i_2;
+                //_Psis[i, 3] = Psi_i_3;
             }
-            Debug.Log("Psi 0,0:");
-            Debug.Log(Psis[0, 0]);
+            for (int it_count = 0; it_count < iterations; it_count++)
+            {
+                var tmp = Psis;
+                _Psis = Psis;
+                Psis = tmp;
+                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+                {
+                    // i : i;
+                    Matrix<float> Psi_i_0;
+                    Matrix<float> Psi_i_1;
+                    Matrix<float> Psi_i_2;
+                    Matrix<float> Psi_i_3;
+                    {
+                        //Psi_i_0 = Psis[i, 0];
+                        //Psi_i_1 = Psis[i, 1];
+                        //Psi_i_2 = Psis[i, 2];
+                        //Psi_i_3 = Psis[i, 3];
+
+                        Psi_i_0 = Matrix<float>.Build.Dense(4, 4, 0);
+                        Psi_i_1 = Matrix<float>.Build.Dense(4, 4, 0);
+                        Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
+                        Psi_i_3 = Matrix<float>.Build.Dense(4, 4, 0);
+                    }
+                    for (int k = 0; k < CurrentMesh.vertices.Length; k++)
+                    {
+                        var AorB = B_p[i,k];
+                        if(AorB!=0f)
+                        {
+
+                            Psi_i_0 += (AorB * _Psis[k, 0]);
+                            Psi_i_1 += (AorB * _Psis[k, 1]);
+                            Psi_i_2 += (AorB * _Psis[k, 2]);
+                            Psi_i_3 += (AorB * _Psis[k, 3]);
+                        }
+                    }
+                    Psis[i, 0] = Psi_i_0;
+                    Psis[i, 1] = Psi_i_1;
+                    Psis[i, 2] = Psi_i_2;
+                    Psis[i, 3] = Psi_i_3;
+                }
+            }
         }
         // Update is called once per frame
         void Update()
@@ -107,26 +180,43 @@ namespace DDM_Impl
         }
         Matrix4x4[] boneM;
         Matrix<float>[] boneM_;
+        Matrix<float> Q = Matrix<float>.Build.Dense(3, 3);
+        Matrix<float> pt = Matrix<float>.Build.Dense(1, 3);
+        Matrix<float> p = Matrix<float>.Build.Dense(3, 1);
+        Matrix<float> q = Matrix<float>.Build.Dense(3, 1);
         void OnFrame()
         {
             for (int i = 0; i < Bones.Length; i++)
             {
-                boneM[i] = Bones[i].RootSpaceMatrix (Root)* BindPoses[i];
-                boneM_[i] = boneM[i].ToMatrix();
+                boneM[i] = Bones[i].worldToLocalMatrix * BindPoses[i];
+                boneM[i].ToMatrix(boneM_[i]);
             }
+            Matrix<float> Omega;
             for (int i = 0; i < Vertices.Length; i++)
             {
                 var wei = CurrentMesh.boneWeights[i];
+                Omega = (boneM_[wei.boneIndex0]) * Psis[i, 0] +
+                   (boneM_[wei.boneIndex1]) * Psis[i, 1] +
+                   (boneM_[wei.boneIndex2]) * Psis[i, 2] +
+                   (boneM_[wei.boneIndex3]) * Psis[i, 3];
 
-                Matrix<float> Omega = (boneM_[wei.boneIndex0]) * Psis[i, 0] +
-                    (boneM_[wei.boneIndex1]) * Psis[i, 1] +
-                    (boneM_[wei.boneIndex2]) * Psis[i, 2] +
-                    (boneM_[wei.boneIndex3]) * Psis[i, 3];
-                Matrix<float> Q = Omega.SubMatrix(0, 3, 0, 3);
-                Matrix<float> pt = Omega.SubMatrix(3, 1, 0, 3);
-                Matrix<float> p = pt.Transpose();
-                //Matrix<float> pt=p.Transpose();
-                Matrix<float> q = Omega.SubMatrix(0, 3, 3, 1);
+                for (int x = 0; x < 3; x++)
+                {
+                    for (int y = 0; y < 3; y++)
+                    {
+                        Q[x, y] = Omega[x, y];
+                    }
+                }
+                q[0, 0] = Omega[0, 3];
+                q[1, 0] = Omega[1, 3];
+                q[2, 0] = Omega[2, 3];
+                //Q = Omega.SubMatrix(0, 3, 0, 3);
+                //pt = Omega.SubMatrix(3, 1, 0, 3);
+                pt[0, 0] = Omega[3, 0];
+                pt[0, 1] = Omega[3, 1];
+                pt[0, 2] = Omega[3, 2];
+                pt.Transpose(p);
+                //q = Omega.SubMatrix(0, 3, 3, 1);
                 //Debug.Log($"P:Row->{pt.RowCount},Column->{pt.ColumnCount}");
                 //Debug.Log($"Pt:Row->{pt.RowCount},Column->{pt.ColumnCount}");
                 //Debug.Log($"q:Row->{q.RowCount},Column->{q.ColumnCount}");
@@ -147,23 +237,24 @@ namespace DDM_Impl
                     //    new Vector4 { x = R[0, 2], y = R[1, 2], z = R[2, 2], w = T[2, 0] },
                     //    new Vector4 { x = 0, y = 0, z = 0, w = 1 }
                     //);
-                    Matrix4x4 trans = Matrix4x4.Scale(Vector3.one);
-                    for (int x = 0; x < 3; ++x)
+                    //Matrix4x4 trans = Matrix4x4.Scale(Vector3.one);
+                    Matrix4x4 trans = Matrix4x4.zero;
+                    for (int x = 0; x < 3; x++)
                     {
-                        for (int y = 0; y < 3; ++y)
+                        for (int y = 0; y < 3; y++)
                         {
                             trans[x, y] = R[x, y];
                         }
                     }
-                    trans[0, 3] = T[0,0];
-                    trans[1, 3] = T[1,0];
+                    trans[0, 3] = T[0, 0];
+                    trans[1, 3] = T[1, 0];
                     trans[2, 3] = T[2, 0];
                     trans[3, 3] = 1;
                     //new Vector4 { x = R[0, 0], y = R[0, 1], z = R[0, 2], w = T[0, 0] },
                     //    new Vector4 { x = R[1, 1], y = R[1, 1], z = R[1, 2], w = T[1, 0] },
                     //    new Vector4 { x = R[2, 2], y = R[2, 1], z = R[2, 2], w = T[2, 0] },
-                    
-                    AlteredVertices[i] =trans.MultiplyPoint(Vertices[i]);
+
+                    AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
                     AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
                 }
                 catch (System.Exception)
@@ -172,21 +263,48 @@ namespace DDM_Impl
                 }
 
             }
+            //if (GC_Count == 10)
+            //{
+            //    System.GC.Collect(0, System.GCCollectionMode.Optimized, false);
+            //    GC_Count = 0;
+            //}
+            //GC_Count++;
             CurrentMesh.vertices = AlteredVertices;
             CurrentMesh.normals = AlteredNormals;
             //Graphics.DrawMesh(CurrentMesh, Matrix4x4.identity, TargetSMR.sharedMaterial, 0);
         }
+        int GC_Count = 0;
         Matrix<float> u_;
+        Matrix<float>[] u__;
         Matrix<float> v_;
         Matrix<float> normalizedLaplacian;
         Matrix<float> _Smooth_vs_mat;
         Matrix<float> _Smooth_us;
 
+        public void CalcAMatrix(float Lambda)
+        {
+            A = Matrix<float>.Build.DiagonalIdentity(LaplacianMatrix.RowCount, LaplacianMatrix.ColumnCount) - (LaplacianMatrix * Lambda);
+            A_p = Matrix<float>.Build.Sparse(A.RowCount, A.ColumnCount);
+            A.Power(iterations, A_p);
+        }
         public void CalcBMatrix(float Lambda)
         {
-            B = Matrix<float>.Build.DiagonalIdentity(LaplacianMatrix.RowCount, LaplacianMatrix.ColumnCount)+(LaplacianMatrix*Lambda);
-            //B_p = Matrix<float>.Build.Sparse(B.RowCount, B.ColumnCount);
-            //B.Power(iterations,B_p);
+            var w = LaplacianMatrix.RowCount;
+            var h = LaplacianMatrix.ColumnCount;
+            //var DL = Matrix<float>.Build.DiagonalIdentity(w, h) * Lambda;
+            var iB = (Matrix<float>.Build.DiagonalIdentity(w, h) - (Lambda * LaplacianMatrix));//.Transpose(); //* DL);
+            B_p = iB;
+            return;
+            B_p = Matrix<float>.Build.DiagonalIdentity(w, h);// + (Lambda * LaplacianMatrix); //* DL);
+            for (int i = 0; i < iterations; i++)
+            {
+                B_p = iB.Solve(B_p);
+            }
+
+            //B_p = Matrix<float>.Build.Sparse(w,h);
+            //B.Power(iterations, B_p);
+            //B_p = B_p.Inverse();
+            //B_p = Matrix<float>.Build.Dense(B.RowCount, B.ColumnCount, 1);
         }
         public void BuildUs()
         {
@@ -202,6 +320,7 @@ namespace DDM_Impl
             //}
             //var bw = CurrentMesh.boneWeights;
             var vert = CurrentMesh.vertices;
+            u__ = new Matrix<float>[vert.Length];
             u_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             //v_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             //Vector3[] vs = new Vector3[vert.Length];
@@ -215,6 +334,7 @@ namespace DDM_Impl
                 var vert_i = vert[i];
 
                 Matrix<float> u = Matrix<float>.Build.DenseOfColumnArrays(new float[] { vert_i.x, vert_i.y, vert_i.z, 1 });
+                u__[i] = u;
                 //us[i] = u;
                 //Matrix<float> v;
                 //{
@@ -233,9 +353,11 @@ namespace DDM_Impl
         }
         public Matrix<float> IterativeSolveAx_B(Matrix<float> m, int iteration, float B)
         {
+            //return m * B;
+            //return m * (Mathf.Pow(B, iteration));
             if (iteration == 1) return m;
             iteration -= 1;
-            return IterativeSolveAx_B(m, iteration, B) / B;
+            return m + IterativeSolveAx_B(m, iteration, B) / B;
         }
         public Matrix<float> IterativeCalcB(Matrix<float> m, int iteration)
         {
@@ -262,16 +384,19 @@ namespace DDM_Impl
             //    LaplacianMatrix[i, i] = D[i];
 
             //}
+            var adj = MatrixUtils.BuildAdjacencyMatrix(Vertices, CurrentMesh.triangles, 16);
+            normalizedLaplacian = LaplacianMatrix = MatrixUtils.BuildLaplacianMatrixFromAdjacentMatrix(Vertices.Length, adj, true);
+            return;
             AdjacencyMatrix _AdjacencyMatrix = AdjacencyMatrix.FromMesh(CurrentMesh);
             var deg = DegMatrix.FromMesh(CurrentMesh);
             Matrix<float> DegMat = deg.Matrix;
-            DegMat = DegMat.Multiply(3);
-            LaplacianMatrix = DegMat.Subtract(_AdjacencyMatrix);
+            //DegMat = DegMat.Multiply(3);
+            LaplacianMatrix = DegMat - (_AdjacencyMatrix);
+
             var DL = LaplacianMatrix.Diagonal();
             var DL_m = Matrix<float>.Build.Diagonal(DL.ToArray());
             var DL_m_I = DL_m.Inverse();
             normalizedLaplacian = LaplacianMatrix.Multiply(DL_m_I);
-
         }
         int[] D;
         void BuildD()
