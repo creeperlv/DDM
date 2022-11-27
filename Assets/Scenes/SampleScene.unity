@@ -3389,8 +3389,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TargetSMR: {fileID: 1692425713}
-  Lambda: 0.5
-  iterations: 20
+  Lambda: 0.9
+  iterations: 2
   Root: {fileID: 1836784121}
 --- !u!33 &1692425716
 MeshFilter:
@@ -3407,7 +3407,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1692425710}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1

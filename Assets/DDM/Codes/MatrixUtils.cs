@@ -48,7 +48,30 @@ namespace DDM_Impl
 
             return adj;
         }
-
+        public static Matrix<float>[,] Duplicate(this Matrix<float>[,] m)
+        {
+            Matrix<float>[,] res=new Matrix<float>[m.GetLength(0), m.GetLength(1)];
+            for (int x = 0; x < m.GetLength(0); x++)
+            {
+                for (int y = 0; y < m.GetLength(1); y++)
+                {
+                    res[x, y] = m[x, y];
+                }
+            }
+            return res;
+        }
+        public static Matrix<float> Duplicate(this Matrix<float> m)
+        {
+            var res=Matrix<float>.Build.SameAs(m);
+            for (int x = 0; x < m.RowCount; x++)
+            {
+                for (int y = 0; y < m.ColumnCount; y++)
+                {
+                    res[x,y] = m[x, y];
+                }
+            }
+            return res;
+        }
         private static void BroadcastAdjacencyFromUniqueToAllVertices(ref int[,] adjacencyMatrix, int[] mapToUnique)
         {
 

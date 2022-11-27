@@ -68,87 +68,40 @@ namespace DDM_Impl
         {
             //Debug.Log($"u_:Row->{u_.RowCount},Column->{u_.ColumnCount}");
             Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
-            var _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+            Matrix<float> [,] _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+
+            Matrix<float> Psi_i_0;
+            Matrix<float> Psi_i_1;
+            Matrix<float> Psi_i_2;
+            Matrix<float> Psi_i_3;
             for (int i = 0; i < CurrentMesh.vertices.Length; i++)
             {
-                // i : i;
-                Matrix<float> Psi_i_0;
-                Matrix<float> Psi_i_1;
-                Matrix<float> Psi_i_2;
-                Matrix<float> Psi_i_3;
-                Psi_i_0 = Matrix<float>.Build.Dense(4, 4, 0);
-                Psi_i_1 = Matrix<float>.Build.Dense(4, 4, 0);
-                Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
-                Psi_i_3 = Matrix<float>.Build.Dense(4, 4, 0);
-                //for (int k = 0; k < CurrentMesh.vertices.Length; k++)
                 {
                     var wei = CurrentMesh.boneWeights[i];
-                    //var v=Vertices[k];
-                    //var u_k = Matrix<float>.Build.DenseOfColumns(new float[1][]{ new float[4] { v.x, v.y, v.z, 1 } });
-                    //var u_k = u_.Row(k).ToColumnMatrix();
-                    //var u_k = u__[k];
                     var u_col = u_.Row(i);
-                    //var u_k_calced = u_k * u_k.Transpose();
                     var u_k_calced = u_col.OuterProduct(u_col);
-                    //var AorB = B_p[i, i];
-
-                    //float[] v = new float[] { u_[k, 0], u_[k, 1], u_[k, 2], 1.0f };
-                    //DenseVector rw = new DenseVector(v);
-
-                    //var hh=rw.OuterProduct(rw);
-
-                    //if (AorB != 0f)
                     {
-                        Psi_i_0 += (wei.weight0 * u_k_calced);// [0, 0];
-                        Psi_i_1 += (wei.weight1 * u_k_calced);// [0, 0];
-                        Psi_i_2 += (wei.weight2 * u_k_calced);// [0, 0];
-                        Psi_i_3 += (wei.weight3 * u_k_calced);// [0, 0];
-
-                        //Psi_i_0 += (AorB * wei.weight0 * u_k_calced);// [0, 0];
-                        //Psi_i_1 += (AorB * wei.weight1 * u_k_calced);// [0, 0];
-                        //Psi_i_2 += (AorB * wei.weight2 * u_k_calced);// [0, 0];
-                        //Psi_i_3 += (AorB * wei.weight3 * u_k_calced);// [0, 0];
-                    }
-                    //else
-                    {
-                        //Psi_i_0 += (AorB * wei.weight0 * u_k_calced);// [0, 0];
-                        //Psi_i_1 += (AorB * wei.weight1 * u_k_calced);// [0, 0];
-                        //Psi_i_2 += (AorB * wei.weight2 * u_k_calced);// [0, 0];
-                        //Psi_i_3 += (AorB * wei.weight3 * u_k_calced);// [0, 0];
-                        //Psi_i_0 += IterativeSolveAx_B(wei.weight0 * u_k_calced, iterations, B[k, i]);
-                        //Psi_i_1 += IterativeSolveAx_B(wei.weight1 * u_k_calced, iterations, B[k, i]);
-                        //Psi_i_2 += IterativeSolveAx_B(wei.weight2 * u_k_calced, iterations, B[k, i]);
-                        //Psi_i_3 += IterativeSolveAx_B(wei.weight3 * u_k_calced, iterations, B[k, i]);
-
+                        Psis[i, 0] = (wei.weight0 * u_k_calced);// [0, 0];
+                        Psis[i, 1] = (wei.weight1 * u_k_calced);// [0, 0];
+                        Psis[i, 2] = (wei.weight2 * u_k_calced);// [0, 0];
+                        Psis[i, 3] = (wei.weight3 * u_k_calced);// [0, 0];
                     }
                 }
-                Psis[i, 0] = Psi_i_0;
-                Psis[i, 1] = Psi_i_1;
-                Psis[i, 2] = Psi_i_2;
-                Psis[i, 3] = Psi_i_3;
-                //_Psis[i, 0] = Psi_i_0;
-                //_Psis[i, 1] = Psi_i_1;
-                //_Psis[i, 2] = Psi_i_2;
-                //_Psis[i, 3] = Psi_i_3;
+                //Psis[i, 0] = Psi_i_0.Duplicate();
+                //Psis[i, 1] = Psi_i_1.Duplicate();
+                //Psis[i, 2] = Psi_i_2.Duplicate();
+                //Psis[i, 3] = Psi_i_3.Duplicate();
             }
             for (int it_count = 0; it_count < iterations; it_count++)
             {
-                var tmp = Psis;
-                _Psis = Psis;
+                var tmp = _Psis.Duplicate();
+                _Psis = Psis.Duplicate();
                 Psis = tmp;
+                //Psis = tmp;
                 for (int i = 0; i < CurrentMesh.vertices.Length; i++)
                 {
                     // i : i;
-                    Matrix<float> Psi_i_0;
-                    Matrix<float> Psi_i_1;
-                    Matrix<float> Psi_i_2;
-                    Matrix<float> Psi_i_3;
                     {
-                        //Psi_i_0 = Psis[i, 0];
-                        //Psi_i_1 = Psis[i, 1];
-                        //Psi_i_2 = Psis[i, 2];
-                        //Psi_i_3 = Psis[i, 3];
-
                         Psi_i_0 = Matrix<float>.Build.Dense(4, 4, 0);
                         Psi_i_1 = Matrix<float>.Build.Dense(4, 4, 0);
                         Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
@@ -166,10 +119,10 @@ namespace DDM_Impl
                             Psi_i_3 += (AorB * _Psis[k, 3]);
                         }
                     }
-                    Psis[i, 0] = Psi_i_0;
-                    Psis[i, 1] = Psi_i_1;
-                    Psis[i, 2] = Psi_i_2;
-                    Psis[i, 3] = Psi_i_3;
+                    Psis[i, 0] = Psi_i_0.Duplicate();
+                    Psis[i, 1] = Psi_i_1.Duplicate();
+                    Psis[i, 2] = Psi_i_2.Duplicate();
+                    Psis[i, 3] = Psi_i_3.Duplicate();
                 }
             }
         }
@@ -188,7 +141,7 @@ namespace DDM_Impl
         {
             for (int i = 0; i < Bones.Length; i++)
             {
-                boneM[i] = Bones[i].worldToLocalMatrix * BindPoses[i];
+                boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
                 boneM[i].ToMatrix(boneM_[i]);
             }
             Matrix<float> Omega;
@@ -271,7 +224,7 @@ namespace DDM_Impl
             //GC_Count++;
             CurrentMesh.vertices = AlteredVertices;
             CurrentMesh.normals = AlteredNormals;
-            //Graphics.DrawMesh(CurrentMesh, Matrix4x4.identity, TargetSMR.sharedMaterial, 0);
+            Graphics.DrawMesh(CurrentMesh, Matrix4x4.identity, TargetSMR.sharedMaterial, 0);
         }
         int GC_Count = 0;
         Matrix<float> u_;
@@ -292,14 +245,14 @@ namespace DDM_Impl
             var w = LaplacianMatrix.RowCount;
             var h = LaplacianMatrix.ColumnCount;
             //var DL = Matrix<float>.Build.DiagonalIdentity(w, h) * Lambda;
-            var iB = (Matrix<float>.Build.DiagonalIdentity(w, h) - (Lambda * LaplacianMatrix));//.Transpose(); //* DL);
-            B_p = iB;
+            B = (Matrix<float>.Build.DiagonalIdentity(w, h) - (Lambda * LaplacianMatrix));//.Transpose(); //* DL);
+            B_p = B;
             return;
-            B_p = Matrix<float>.Build.DiagonalIdentity(w, h);// + (Lambda * LaplacianMatrix); //* DL);
-            for (int i = 0; i < iterations; i++)
-            {
-                B_p = iB.Solve(B_p);
-            }
+            //B_p = Matrix<float>.Build.DiagonalIdentity(w, h);// + (Lambda * LaplacianMatrix); //* DL);
+            //for (int i = 0; i < iterations; i++)
+            //{
+            //    B_p = iB.Solve(B_p);
+            //}
 
             //B_p = Matrix<float>.Build.Sparse(w,h);
             //B.Power(iterations, B_p);
@@ -384,7 +337,7 @@ namespace DDM_Impl
             //    LaplacianMatrix[i, i] = D[i];
 
             //}
-            var adj = MatrixUtils.BuildAdjacencyMatrix(Vertices, CurrentMesh.triangles, 16);
+            var adj = MatrixUtils.BuildAdjacencyMatrix(Vertices, CurrentMesh.triangles, 32);
             normalizedLaplacian = LaplacianMatrix = MatrixUtils.BuildLaplacianMatrixFromAdjacentMatrix(Vertices.Length, adj, true);
             return;
             AdjacencyMatrix _AdjacencyMatrix = AdjacencyMatrix.FromMesh(CurrentMesh);
