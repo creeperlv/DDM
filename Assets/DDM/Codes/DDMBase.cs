@@ -10,6 +10,7 @@ namespace DDM_Impl
     public class DDMBase : MonoBehaviour
     {
         public SkinnedMeshRenderer TargetSMR;
+        public ComputeShader _CShader;
         public float Lambda;
         public int iterations = 1;
         public Transform Root;

@@ -1852,6 +1852,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TargetSMR: {fileID: 496586288}
+  _CShader: {fileID: 0}
   Lambda: 0.2
   iterations: 2
   Root: {fileID: 496586287}
@@ -3688,6 +3689,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TargetSMR: {fileID: 1692425713}
+  _CShader: {fileID: 7200000, guid: fae73fd1725448f46b523d7b3a4bc84c, type: 3}
   Lambda: 0.2
   iterations: 2
   Root: {fileID: 1836784121}
