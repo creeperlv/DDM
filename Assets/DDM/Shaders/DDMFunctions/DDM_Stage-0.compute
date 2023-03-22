@@ -1,6 +1,7 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 #pragma kernel PreDelta
+#define MAX_X 256
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> Result;
@@ -18,7 +19,7 @@ float Psi;
 
 RWStructuredBuffer<float3> O_Vert;
 RWStructuredBuffer<float3> O_Nor;
-[numthreads(8, 8, 1)]
+[numthreads(MAX_X, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!

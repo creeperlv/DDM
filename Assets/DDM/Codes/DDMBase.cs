@@ -1,16 +1,18 @@
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Single;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
 using UnityEngine;
-namespace DDM_Impl
-{
-    public class DDMBase : MonoBehaviour
-    {
+namespace DDM_Impl {
+    public class DDMBase : MonoBehaviour {
         public SkinnedMeshRenderer TargetSMR;
         public ComputeShader _CShader;
+        ComputeBuffer OutVert;
+        public bool UseComputeShader;
         public float Lambda;
         public int iterations = 1;
         public Transform Root;
@@ -21,8 +23,7 @@ namespace DDM_Impl
         Vector3[] AlteredVertices;
         Vector3[] AlteredNormals;
         Transform[] Bones;
-        void Start()
-        {
+        void Start() {
             CurrentMesh = Mesh.Instantiate(TargetSMR.sharedMesh);
             var MF = this.GetComponent<MeshFilter>();
             MF.mesh = CurrentMesh;
@@ -45,38 +46,39 @@ namespace DDM_Impl
             Bones = TargetSMR.bones;
             boneM = new Matrix4x4[Bones.Length];
             boneM_ = new Matrix<float>[Bones.Length];
-            for (int i = 0; i < Bones.Length; i++)
-            {
+            for (int i = 0; i < Bones.Length; i++) {
                 boneM_[i] = Matrix<float>.Build.Dense(4, 4);
             }
             Precompute();
+            SetupComputerShader();
         }
-
+        void SetupComputerShader() {
+            ComputeBuffer vert = new ComputeBuffer(Vertices.Length, sizeof(float));
+            vert.SetData(Vertices);
+            _CShader.SetBuffer(0, Shader.PropertyToID("Vertices"), vert);
+        }
         Matrix<float> B;
         Matrix<float> A;
         Matrix<float> A_p;
         Matrix<float> B_p;
         Matrix<float>[,] Psis;
-        void Precompute()
-        {
+        void Precompute() {
             CalcuateNormalizedLaplace();
 
             CalcBMatrix(Lambda);
             BuildUs();
             CalcPsis();
         }
-        void CalcPsis()
-        {
+        void CalcPsis() {
             //Debug.Log($"u_:Row->{u_.RowCount},Column->{u_.ColumnCount}");
             Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
-            Matrix<float> [,] _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+            Matrix<float>[,] _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
 
             Matrix<float> Psi_i_0;
             Matrix<float> Psi_i_1;
             Matrix<float> Psi_i_2;
             Matrix<float> Psi_i_3;
-            for (int i = 0; i < CurrentMesh.vertices.Length; i++)
-            {
+            for (int i = 0; i < CurrentMesh.vertices.Length; i++) {
                 {
                     var wei = CurrentMesh.boneWeights[i];
                     var u_col = u_.Row(i);
@@ -93,14 +95,12 @@ namespace DDM_Impl
                 //Psis[i, 2] = Psi_i_2.Duplicate();
                 //Psis[i, 3] = Psi_i_3.Duplicate();
             }
-            for (int it_count = 0; it_count < iterations; it_count++)
-            {
+            for (int it_count = 0; it_count < iterations; it_count++) {
                 var tmp = _Psis.Duplicate();
                 _Psis = Psis.Duplicate();
                 Psis = tmp;
                 //Psis = tmp;
-                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
-                {
+                for (int i = 0; i < CurrentMesh.vertices.Length; i++) {
                     // i : i;
                     {
                         Psi_i_0 = Matrix<float>.Build.Dense(4, 4, 0);
@@ -108,11 +108,9 @@ namespace DDM_Impl
                         Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
                         Psi_i_3 = Matrix<float>.Build.Dense(4, 4, 0);
                     }
-                    for (int k = 0; k < CurrentMesh.vertices.Length; k++)
-                    {
-                        var AorB = B_p[i,k];
-                        if(AorB!=0f)
-                        {
+                    for (int k = 0; k < CurrentMesh.vertices.Length; k++) {
+                        var AorB = B_p[i, k];
+                        if (AorB != 0f) {
 
                             Psi_i_0 += (AorB * _Psis[k, 0]);
                             Psi_i_1 += (AorB * _Psis[k, 1]);
@@ -128,8 +126,7 @@ namespace DDM_Impl
             }
         }
         // Update is called once per frame
-        void Update()
-        {
+        void Update() {
             OnFrame();
         }
         Matrix4x4[] boneM;
@@ -138,65 +135,52 @@ namespace DDM_Impl
         Matrix<float> pt = Matrix<float>.Build.Dense(1, 3);
         Matrix<float> p = Matrix<float>.Build.Dense(3, 1);
         Matrix<float> q = Matrix<float>.Build.Dense(3, 1);
-        void OnFrame()
-        {
-            for (int i = 0; i < Bones.Length; i++)
-            {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void OnComputeShader() {
+            for (int i = 0; i < Bones.Length; i++) {
                 boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
                 boneM[i].ToMatrix(boneM_[i]);
             }
+            _CShader.Dispatch(0, Vertices.Length, 1, 1);
+            
+        }
+        void OnFrame() {
+            for (int i = 0; i < Bones.Length; i++) {
+                boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
+                boneM[i].ToMatrix(boneM_[i]);
+            }
+            if (UseComputeShader && Constants.SupportComputerShader) {
+                OnComputeShader();
+                return;
+            }
             Matrix<float> Omega;
-            for (int i = 0; i < Vertices.Length; i++)
-            {
+            for (int i = 0; i < Vertices.Length; i++) {
                 var wei = CurrentMesh.boneWeights[i];
                 Omega = (boneM_[wei.boneIndex0]) * Psis[i, 0] +
                    (boneM_[wei.boneIndex1]) * Psis[i, 1] +
                    (boneM_[wei.boneIndex2]) * Psis[i, 2] +
                    (boneM_[wei.boneIndex3]) * Psis[i, 3];
 
-                for (int x = 0; x < 3; x++)
-                {
-                    for (int y = 0; y < 3; y++)
-                    {
+                for (int x = 0; x < 3; x++) {
+                    for (int y = 0; y < 3; y++) {
                         Q[x, y] = Omega[x, y];
                     }
                 }
                 q[0, 0] = Omega[0, 3];
                 q[1, 0] = Omega[1, 3];
                 q[2, 0] = Omega[2, 3];
-                //Q = Omega.SubMatrix(0, 3, 0, 3);
-                //pt = Omega.SubMatrix(3, 1, 0, 3);
                 pt[0, 0] = Omega[3, 0];
                 pt[0, 1] = Omega[3, 1];
                 pt[0, 2] = Omega[3, 2];
                 pt.Transpose(p);
-                //q = Omega.SubMatrix(0, 3, 3, 1);
-                //Debug.Log($"P:Row->{pt.RowCount},Column->{pt.ColumnCount}");
-                //Debug.Log($"Pt:Row->{pt.RowCount},Column->{pt.ColumnCount}");
-                //Debug.Log($"q:Row->{q.RowCount},Column->{q.ColumnCount}");
                 var USV = Q - q * pt;
-                //Debug.Log($"USV:Row->{USV.RowCount},Column->{USV.ColumnCount}");
-                try
-                {
+                try {
                     var SVD = USV.Svd();
                     var R = SVD.U * SVD.VT;
                     var T = q - R * p;
-                    //Debug.Log($"q:{q}");
-                    //Debug.Log($"p:{p}");
-                    //Debug.Log(T);
-                    //Matrix4x4 matrix4X4 = Matrix4x4.Translate(MatrixUtils.ToVector3(T));
-                    //Matrix4x4 _r = new Matrix4x4(
-                    //    new Vector4 { x = R[0, 0], y = R[1, 0], z = R[2, 0], w = T[0, 0] },
-                    //    new Vector4 { x = R[0, 1], y = R[1, 1], z = R[2, 1], w = T[1, 0] },
-                    //    new Vector4 { x = R[0, 2], y = R[1, 2], z = R[2, 2], w = T[2, 0] },
-                    //    new Vector4 { x = 0, y = 0, z = 0, w = 1 }
-                    //);
-                    //Matrix4x4 trans = Matrix4x4.Scale(Vector3.one);
                     Matrix4x4 trans = Matrix4x4.zero;
-                    for (int x = 0; x < 3; x++)
-                    {
-                        for (int y = 0; y < 3; y++)
-                        {
+                    for (int x = 0; x < 3; x++) {
+                        for (int y = 0; y < 3; y++) {
                             trans[x, y] = R[x, y];
                         }
                     }
@@ -204,15 +188,11 @@ namespace DDM_Impl
                     trans[1, 3] = T[1, 0];
                     trans[2, 3] = T[2, 0];
                     trans[3, 3] = 1;
-                    //new Vector4 { x = R[0, 0], y = R[0, 1], z = R[0, 2], w = T[0, 0] },
-                    //    new Vector4 { x = R[1, 1], y = R[1, 1], z = R[1, 2], w = T[1, 0] },
-                    //    new Vector4 { x = R[2, 2], y = R[2, 1], z = R[2, 2], w = T[2, 0] },
 
                     AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
                     AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
                 }
-                catch (System.Exception)
-                {
+                catch (System.Exception) {
                     //Debug.Log($"Failed on SVD:{USV}");
                 }
 
@@ -235,14 +215,12 @@ namespace DDM_Impl
         Matrix<float> _Smooth_vs_mat;
         Matrix<float> _Smooth_us;
 
-        public void CalcAMatrix(float Lambda)
-        {
+        public void CalcAMatrix(float Lambda) {
             A = Matrix<float>.Build.DiagonalIdentity(LaplacianMatrix.RowCount, LaplacianMatrix.ColumnCount) - (LaplacianMatrix * Lambda);
             A_p = Matrix<float>.Build.Sparse(A.RowCount, A.ColumnCount);
             A.Power(iterations, A_p);
         }
-        public void CalcBMatrix(float Lambda)
-        {
+        public void CalcBMatrix(float Lambda) {
             var w = LaplacianMatrix.RowCount;
             var h = LaplacianMatrix.ColumnCount;
             //var DL = Matrix<float>.Build.DiagonalIdentity(w, h) * Lambda;
@@ -260,8 +238,7 @@ namespace DDM_Impl
             //B_p = B_p.Inverse();
             //B_p = Matrix<float>.Build.Dense(B.RowCount, B.ColumnCount, 1);
         }
-        public void BuildUs()
-        {
+        public void BuildUs() {
             /* 
              * Equation.1 
              */
@@ -282,8 +259,7 @@ namespace DDM_Impl
             //_Smooth_vs_mat = Matrix<float>.Build.Sparse(vert.Length, 4);
             //Matrix<float>[] us = new Matrix<float>[vert.Length];
             //_Smooth_us = Matrix<float>.Build.Sparse(vert.Length, 4);
-            for (int i = 0; i < vert.Length; i++)
-            {
+            for (int i = 0; i < vert.Length; i++) {
                 //var bw_i = bw[i];
                 var vert_i = vert[i];
 
@@ -305,23 +281,20 @@ namespace DDM_Impl
             //_Smooth_vs_mat = IterativeCalcB(v_, iterations);
             //_Smooth_us = IterativeCalcB(u_, iterations);
         }
-        public Matrix<float> IterativeSolveAx_B(Matrix<float> m, int iteration, float B)
-        {
+        public Matrix<float> IterativeSolveAx_B(Matrix<float> m, int iteration, float B) {
             //return m * B;
             //return m * (Mathf.Pow(B, iteration));
             if (iteration == 1) return m;
             iteration -= 1;
             return m + IterativeSolveAx_B(m, iteration, B) / B;
         }
-        public Matrix<float> IterativeCalcB(Matrix<float> m, int iteration)
-        {
+        public Matrix<float> IterativeCalcB(Matrix<float> m, int iteration) {
             if (iteration == 0) return m;
             iteration -= 1;
             return B.Solve(IterativeCalcB(m, iteration));
         }
         Matrix<float> LaplacianMatrix;
-        public void CalcuateNormalizedLaplace()
-        {
+        public void CalcuateNormalizedLaplace() {
             //BuildD();
             //LaplacianMatrix=Matrix<float>.Build.Sparse(Vertices.Length, Vertices.Length);
             //for (int i = 0; i < CurrentMesh.triangles.Length; i += 3)
@@ -353,16 +326,17 @@ namespace DDM_Impl
             normalizedLaplacian = LaplacianMatrix.Multiply(DL_m_I);
         }
         int[] D;
-        void BuildD()
-        {
+        void BuildD() {
             D = new int[Vertices.Length];
-            for (int i = 0; i < CurrentMesh.triangles.Length - 2; i += 3)
-            {
+            for (int i = 0; i < CurrentMesh.triangles.Length - 2; i += 3) {
                 D[CurrentMesh.triangles[i]] += 2;
                 D[CurrentMesh.triangles[i + 1]] += 2;
                 D[CurrentMesh.triangles[i + 2]] += 2;
             }
         }
+    }
+    public static class Constants {
+        public static bool SupportComputerShader = SystemInfo.supportsComputeShaders;
     }
 
 }
