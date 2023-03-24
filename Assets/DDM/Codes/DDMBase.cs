@@ -175,7 +175,7 @@ namespace DDM_Impl {
                 pt.Transpose(p);
                 var USV = Q - q * pt;
                 try {
-                    var SVD = USV.Svd();
+                    MathNet.Numerics.LinearAlgebra.Factorization.Svd<float> SVD = USV.Svd();
                     var R = SVD.U * SVD.VT;
                     var T = q - R * p;
                     Matrix4x4 trans = Matrix4x4.zero;
