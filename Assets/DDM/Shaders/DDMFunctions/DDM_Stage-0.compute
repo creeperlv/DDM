@@ -8,7 +8,7 @@ RWTexture2D<float4> Result;
 //IN
 
 StructuredBuffer<float4x4> BoneM;
-StructuredBuffer<float4> BoneBinding;//Per Vertex
+StructuredBuffer<float4> BoneBinding; //Per Vertex
 StructuredBuffer<float3> Vertices;
 StructuredBuffer<float3> Normals;
 StructuredBuffer<float4> Psis;
@@ -17,20 +17,65 @@ float Psi;
 
 RWStructuredBuffer<float3> O_Vert;
 RWStructuredBuffer<float3> O_Nor;
+RWStructuredBuffer<float3x3> USVs;
+float3x3 Multiply(float3x1 A, float1x3 B)
+{
+    float3x3 USV;
+    
+    for (int y = 0; y < 3; Y++)
+        for (int x = 0; x < 3; x++)
+        {
+            USV[x, y] = A[x] * B[y];
+        }
+    return USV;
+}
 [numthreads(MAX_X, 1, 1)]
 void FirstPass(uint3 id : SV_DispatchThreadID)
 {
-    float4x4 Omega;
+    float4 vertBB = BoneBinding[id.x];
+    float4 Psi = Psis[id.x];
+    float Psi0 = Psi.x;
+    float Psi1 = Psi.y;
+    float Psi2 = Psi.z;
+    float Psi3 = Psi.w;
+    float4x4 B0 = BoneM[vertBB.x];
+    float4x4 B1 = BoneM[vertBB.y];
+    float4x4 B2 = BoneM[vertBB.z];
+    float4x4 B3 = BoneM[vertBB.w];
+    float4x4 Omega = B0 * Psi0 + B1 * Psi1
+    + B2 * Psi1 + B3 * Psi3;
     float3x3 Q;
-    float3x1 p;
-    float1x3 q;
+    for (int x = 0; x < 3; x++)
+        for (int y = 0; y < 3; Y++)
+            Q[x, y] = Omega[x, y];
+    float3x1 q;
+    q[0] = Omega[0, 0];
+    q[1] = Omega[1, 0];
+    q[2] = Omega[2, 0];
     float1x3 pT;
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
+    pT[0] = Omega[3, 0];
+    pT[1] = Omega[3, 1];
+    pT[2] = Omega[3, 2];
+    float3x1 p;
+    p[0] = pT[0];
+    p[1] = pT[1];
+    p[2] = pT[2];
+    //float3x3 USV = Q - q * pT;
+    USVs[id.x] = Q - Multiply(q, pT);
+    //Result[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
 }
-[numthreads(MAX_X, 8, 1)]
+float3 Float4x4ByFloat3(float4x4 L, float3 R)
+{
+    float3 result; // = default
+    //(Vector3);
+    result.x = L[0][0] * R.x + L[0][1] * R.y + L[0][2] * R.z +L[0][3];
+    result.y = L[1][0] * R.x + L[1][1] * R.y + L[1][2] * R.z +L[1][3];
+    result.z = L[2][0] * R.x + L[2][1] * R.y + L[2][2] * R.z +L[2][3];
+    return result;
+}
+[numthreads(MAX_X, 4, 1)]
 void SecondPass(uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!
-
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
+    
 }
