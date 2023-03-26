@@ -11,7 +11,7 @@ StructuredBuffer<float4x4> BoneM;
 StructuredBuffer<float4> BoneBinding; //Per Vertex
 StructuredBuffer<float3> Vertices;
 StructuredBuffer<float3> Normals;
-StructuredBuffer<float4> Psis;
+StructuredBuffer<float4x4> Psis;
 
 float Psi;
 
@@ -36,11 +36,11 @@ float3x3 Multiply(float3x1 A, float1x3 B)
 void FirstPass(uint3 id : SV_DispatchThreadID)
 {
     float4 vertBB = BoneBinding[id.x];
-    float4 Psi = Psis[id.x];
-    float Psi0 = Psi.x;
-    float Psi1 = Psi.y;
-    float Psi2 = Psi.z;
-    float Psi3 = Psi.w;
+    //float4x4 Psi = Psis[id.x];
+    float4x4 Psi0 = Psis[id.x + 4 + 0];
+    float4x4 Psi1 = Psis[id.x + 4 + 1];
+    float4x4 Psi2 = Psis[id.x + 4 + 2];
+    float4x4 Psi3 = Psis[id.x + 4 + 3];
     float4x4 B0 = BoneM[vertBB.x];
     float4x4 B1 = BoneM[vertBB.y];
     float4x4 B2 = BoneM[vertBB.z];

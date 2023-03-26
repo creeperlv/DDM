@@ -218,6 +218,18 @@ namespace DDM_Impl
                 }
             }
         }
+        public static Matrix4x4 ToMatrix(this Matrix<float>  m)
+        {
+            Matrix4x4 result = new Matrix4x4();
+            for (int x = 0; x < 4; x++)
+            {
+                for (int y = 0; y < 4; y++)
+                {
+                    result[x, y] = m[x, y];
+                }
+            }
+            return result;
+        }
         public static Matrix<float> ToMatrix(this Matrix4x4 m)
         {
             Matrix<float> matrix = Matrix<float>.Build.Dense(4, 4);
