@@ -16,7 +16,6 @@ namespace DDM_Impl
         ComputeBuffer OutVert;
         ComputeBuffer OutNor;
         ComputeBuffer USVs;
-        ComputeBuffer BoneBindings;
         ComputeBuffer BoneMatrixs;
         ComputeBuffer CBPsis;
         public bool UseComputeShader;
@@ -30,6 +29,7 @@ namespace DDM_Impl
         Vector3[] AlteredVertices;
         Vector3[] AlteredNormals;
         Transform[] Bones;
+        Float4[] BoneBinding;
         void Start()
         {
             CurrentMesh = Mesh.Instantiate(TargetSMR.sharedMesh);
@@ -68,6 +68,14 @@ namespace DDM_Impl
             vert.SetData(Vertices);
             CBPsis = new ComputeBuffer(Vertices.Length, sizeof(float) * 4 * 4);
             CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
+            BoneBinding=new Float4[CurrentMesh.boneWeights.Length];
+            for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
+            {
+                BoneBinding[i].x = CurrentMesh.boneWeights[i].weight0;
+                BoneBinding[i].y = CurrentMesh.boneWeights[i].weight1;
+                BoneBinding[i].z = CurrentMesh.boneWeights[i].weight2;
+                BoneBinding[i].w = CurrentMesh.boneWeights[i].weight3;
+            }
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
                 for (int x = 0; x < 4; x++)
@@ -77,6 +85,7 @@ namespace DDM_Impl
             }
             //CBPsis.Set()
             _CShader.SetBuffer(0, Shader.PropertyToID("Vertices"), vert);
+            _CShader.SetBuffer(0, Shader.PropertyToID("BoneBinding"), BoneBinding);
         }
         Matrix<float> B;
         Matrix<float> A;
@@ -175,6 +184,8 @@ namespace DDM_Impl
                 boneM[i].ToMatrix(boneM_[i]);
             }
             //First Pass
+            BoneMatrixs.SetData(boneM);
+
             var fp = _CShader.FindKernel("FirstPass");
             var sp = _CShader.FindKernel("Second");
             _CShader.Dispatch(fp, Vertices.Length, 1, 1);
@@ -186,15 +197,15 @@ namespace DDM_Impl
         }
         void OnFrame()
         {
-            for (int i = 0; i < Bones.Length; i++)
-            {
-                boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
-                boneM[i].ToMatrix(boneM_[i]);
-            }
             if (UseComputeShader && Constants.SupportComputerShader)
             {
                 OnComputeShader();
                 return;
+            }
+            for (int i = 0; i < Bones.Length; i++)
+            {
+                boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
+                boneM[i].ToMatrix(boneM_[i]);
             }
             Matrix<float> Omega;
             for (int i = 0; i < Vertices.Length; i++)
