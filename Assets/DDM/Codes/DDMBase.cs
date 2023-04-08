@@ -17,6 +17,7 @@ namespace DDM_Impl
         ComputeBuffer OutNor;
         ComputeBuffer USVs;
         ComputeBuffer BoneMatrixs;
+        ComputeBuffer BoneBindings;
         ComputeBuffer CBPsis;
         public bool UseComputeShader;
         public float Lambda;
@@ -69,6 +70,7 @@ namespace DDM_Impl
             CBPsis = new ComputeBuffer(Vertices.Length, sizeof(float) * 4 * 4);
             CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
             BoneBinding=new Float4[CurrentMesh.boneWeights.Length];
+            BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(float)*4);
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
                 BoneBinding[i].x = CurrentMesh.boneWeights[i].weight0;
@@ -76,6 +78,7 @@ namespace DDM_Impl
                 BoneBinding[i].z = CurrentMesh.boneWeights[i].weight2;
                 BoneBinding[i].w = CurrentMesh.boneWeights[i].weight3;
             }
+            BoneBindings.SetData(BoneBinding);
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
                 for (int x = 0; x < 4; x++)
@@ -84,8 +87,10 @@ namespace DDM_Impl
                 }
             }
             //CBPsis.Set()
+            CBPsis.SetData(CSPsis);
             _CShader.SetBuffer(0, Shader.PropertyToID("Vertices"), vert);
-            _CShader.SetBuffer(0, Shader.PropertyToID("BoneBinding"), BoneBinding);
+            _CShader.SetBuffer(0, Shader.PropertyToID("Psis"), CBPsis);
+            _CShader.SetBuffer(0, Shader.PropertyToID("BoneBinding"), BoneBindings);
         }
         Matrix<float> B;
         Matrix<float> A;
@@ -186,6 +191,7 @@ namespace DDM_Impl
             //First Pass
             BoneMatrixs.SetData(boneM);
 
+            _CShader.SetBuffer(0, Shader.PropertyToID("BoneM"), BoneMatrixs);
             var fp = _CShader.FindKernel("FirstPass");
             var sp = _CShader.FindKernel("Second");
             _CShader.Dispatch(fp, Vertices.Length, 1, 1);

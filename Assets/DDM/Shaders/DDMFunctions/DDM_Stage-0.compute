@@ -13,8 +13,6 @@ StructuredBuffer<float3> Vertices;
 StructuredBuffer<float3> Normals;
 StructuredBuffer<float4x4> Psis;
 
-float Psi;
-
 RWStructuredBuffer<float3> O_Vert;
 RWStructuredBuffer<float3> O_Nor;
 RWStructuredBuffer<float3x3> USVs;
