@@ -1,7 +1,6 @@
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Single;
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -15,7 +14,9 @@ namespace DDM_Impl
         public ComputeShader _CShader;
         ComputeBuffer OutVert;
         ComputeBuffer OutNor;
-        ComputeBuffer USVs;
+        ComputeBuffer CB_Rs;
+        ComputeBuffer CB_USVs;
+        Float3x3[] USVs;
         ComputeBuffer BoneMatrixs;
         ComputeBuffer BoneBindings;
         ComputeBuffer CBPsis;
@@ -69,8 +70,11 @@ namespace DDM_Impl
             vert.SetData(Vertices);
             CBPsis = new ComputeBuffer(Vertices.Length, sizeof(float) * 4 * 4);
             CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
-            BoneBinding=new Float4[CurrentMesh.boneWeights.Length];
-            BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(float)*4);
+            Rs = new Float3x3[CurrentMesh.vertices.Length];
+            CB_Rs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
+            CB_USVs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
+            BoneBinding = new Float4[CurrentMesh.boneWeights.Length];
+            BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(float) * 4);
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
                 BoneBinding[i].x = CurrentMesh.boneWeights[i].weight0;
@@ -79,6 +83,7 @@ namespace DDM_Impl
                 BoneBinding[i].w = CurrentMesh.boneWeights[i].weight3;
             }
             BoneBindings.SetData(BoneBinding);
+            USVs = new Float3x3[CurrentMesh.vertices.Length];
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
                 for (int x = 0; x < 4; x++)
@@ -87,6 +92,7 @@ namespace DDM_Impl
                 }
             }
             //CBPsis.Set()
+            CB_USVs.SetData(USVs);
             CBPsis.SetData(CSPsis);
             _CShader.SetBuffer(0, Shader.PropertyToID("Vertices"), vert);
             _CShader.SetBuffer(0, Shader.PropertyToID("Psis"), CBPsis);
@@ -175,6 +181,7 @@ namespace DDM_Impl
             OnFrame();
         }
         Matrix4x4[] boneM;
+        Float3x3[] Rs;
         Matrix<float>[] boneM_;
         Matrix<float> Q = Matrix<float>.Build.Dense(3, 3);
         Matrix<float> pt = Matrix<float>.Build.Dense(1, 3);
@@ -197,6 +204,13 @@ namespace DDM_Impl
             _CShader.Dispatch(fp, Vertices.Length, 1, 1);
             //Managed Pass
 
+            CB_USVs.GetData(USVs);
+            for (int i = 0; i < USVs.Length; i++)
+            {
+                var svd = USVs[i].ToMatrix().Svd();
+                Rs[i] = Float3x3.FromMatrix(svd.U * svd.VT);
+            }
+            CB_Rs.SetData(Rs);
             //
             _CShader.Dispatch(sp, Vertices.Length, 1, 1);
 
@@ -241,6 +255,7 @@ namespace DDM_Impl
                 {
                     MathNet.Numerics.LinearAlgebra.Factorization.Svd<float> SVD = USV.Svd();
                     var R = SVD.U * SVD.VT;
+
                     var T = q - R * p;
                     Matrix4x4 trans = Matrix4x4.zero;
                     for (int x = 0; x < 3; x++)
@@ -414,39 +429,5 @@ namespace DDM_Impl
     public static class Constants
     {
         public static bool SupportComputerShader = SystemInfo.supportsComputeShaders;
-    }
-    public struct Float4
-    {
-        public float x;
-        public float y;
-        public float z;
-        public float w;
-        public float this[int index]
-        {
-            get
-            {
-                switch (index)
-                {
-                    case 0: return x;
-                    case 1: return y;
-                    case 2: return z;
-                    case 3: return w;
-                    default:
-                        throw new IndexOutOfRangeException();
-                }
-            }
-            set
-            {
-                switch (index)
-                {
-                    case 0: x = value; break;
-                    case 1: y = value; break;
-                    case 2: z = value; break;
-                    case 3: w = value; break;
-                    default:
-                        break;
-                }
-            }
-        }
     }
 }
