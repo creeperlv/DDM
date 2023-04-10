@@ -1,0 +1,20 @@
+#pragma kernel First
+#pragma kernel Second
+#define MAX_X 256
+StructuredBuffer<float3x3> Rs;
+RWStructuredBuffer<float3x3> Out_Rs;
+RWStructuredBuffer<float3x3> Out_Rs_2;
+[numthreads(MAX_X, 1, 1)]
+void First(uint3 id : SV_DispatchThreadID)
+{
+    float3x3 A = Rs[id.x];
+    A[1][1] += 300;
+    Out_Rs[id.x] = A;
+}
+[numthreads(MAX_X, 1, 1)]
+void Second(uint3 id : SV_DispatchThreadID)
+{
+    float3x3 A = Out_Rs[id.x];
+    A[1][2] += 300;
+    Out_Rs_2[id.x] = A;
+}
