@@ -15,6 +15,8 @@ namespace DDM_Impl
         ComputeBuffer OutVert;
         ComputeBuffer OutNor;
         ComputeBuffer CB_Rs;
+        ComputeBuffer CB_p_s;
+        ComputeBuffer CB_q_s;
         ComputeBuffer CB_USVs;
         Float3x3[] USVs;
         ComputeBuffer BoneMatrixs;
@@ -32,6 +34,8 @@ namespace DDM_Impl
         Vector3[] AlteredNormals;
         Transform[] Bones;
         Float4[] BoneBinding;
+        int __KERNEL_FIRST_PASS;
+        int __KERNEL_SECOND_PASS;
         void Start()
         {
             CurrentMesh = Mesh.Instantiate(TargetSMR.sharedMesh);
@@ -66,6 +70,8 @@ namespace DDM_Impl
         }
         void SetupComputerShader()
         {
+            __KERNEL_FIRST_PASS = _CShader.FindKernel("FirstPass");
+            __KERNEL_SECOND_PASS = _CShader.FindKernel("SecondPass");
             ComputeBuffer vert = new ComputeBuffer(Vertices.Length, sizeof(float));
             vert.SetData(Vertices);
             CBPsis = new ComputeBuffer(Vertices.Length, sizeof(float) * 4 * 4);
@@ -94,9 +100,17 @@ namespace DDM_Impl
             //CBPsis.Set()
             CB_USVs.SetData(USVs);
             CBPsis.SetData(CSPsis);
-            _CShader.SetBuffer(0, Shader.PropertyToID("Vertices"), vert);
-            _CShader.SetBuffer(0, Shader.PropertyToID("Psis"), CBPsis);
-            _CShader.SetBuffer(0, Shader.PropertyToID("BoneBinding"), BoneBindings);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "Vertices", vert);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "Psis", CBPsis);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "BoneBinding", BoneBindings);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "USVs", CB_USVs);
+            _CShader.SetBuffer(0, Shader.PropertyToID("BoneM"), BoneMatrixs);
+
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "Rs", CB_Rs);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "q_s", CB_Rs);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "p_s", CB_p_s);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "O_Vert", OutVert);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "O_Nor", OutNor);
         }
         Matrix<float> B;
         Matrix<float> A;
@@ -198,10 +212,7 @@ namespace DDM_Impl
             //First Pass
             BoneMatrixs.SetData(boneM);
 
-            _CShader.SetBuffer(0, Shader.PropertyToID("BoneM"), BoneMatrixs);
-            var fp = _CShader.FindKernel("FirstPass");
-            var sp = _CShader.FindKernel("Second");
-            _CShader.Dispatch(fp, Vertices.Length, 1, 1);
+            _CShader.Dispatch(__KERNEL_FIRST_PASS, Vertices.Length, 1, 1);
             //Managed Pass
 
             CB_USVs.GetData(USVs);
@@ -212,8 +223,8 @@ namespace DDM_Impl
             }
             CB_Rs.SetData(Rs);
             //
-            _CShader.Dispatch(sp, Vertices.Length, 1, 1);
-
+            _CShader.Dispatch(__KERNEL_SECOND_PASS, Vertices.Length, 1, 1);
+            //OutVert.GetData()
         }
         void OnFrame()
         {

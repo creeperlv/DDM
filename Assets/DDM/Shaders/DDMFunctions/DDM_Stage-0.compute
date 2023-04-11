@@ -50,20 +50,9 @@ void FirstPass(uint3 id : SV_DispatchThreadID)
         for (int y = 0; y < 3; y++)
             Q[x][y] = Omega[x][y];
     float3x1 q = float3x1(Omega[0][0], Omega[1][0], Omega[2][0]);
-    //q[0] = Omega[0, 0];
-    //q[1] = Omega[1, 0];
-    //q[2] = Omega[2, 0];
     float1x3 pT = float1x3(Omega[3][0], Omega[3][1], Omega[3][2]);
-    //pT[0][0] = Omega[3, 0];
-    //pT[0][1] = Omega[3, 1];
-    //pT[0][2] = Omega[3, 2];
     float3x1 p = float3x1(pT[0][0], pT[0][1], pT[0][2]);
-    //p[0] = pT[0][0];
-    //p[1] = pT[0][1];
-    //p[2] = pT[0][2];
-    //float3x3 USV = Q - q * pT;
     USVs[id.x] = Q - Multiply(q, pT);
-    //Result[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
 }
 float3 Float4x4ByFloat3(float4x4 L, float3 R)
 {
