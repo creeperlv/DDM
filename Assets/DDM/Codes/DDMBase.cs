@@ -34,8 +34,11 @@ namespace DDM_Impl
         Vector3[] AlteredNormals;
         Transform[] Bones;
         Float4[] BoneBinding;
+        Float3[] q_s;
+        Float3[] p_s;
         int __KERNEL_FIRST_PASS;
         int __KERNEL_SECOND_PASS;
+        bool FinalCS;
         void Start()
         {
             CurrentMesh = Mesh.Instantiate(TargetSMR.sharedMesh);
@@ -65,28 +68,112 @@ namespace DDM_Impl
                 boneM_[i] = Matrix<float>.Build.Dense(4, 4);
             }
             Precompute();
-            if (UseComputeShader && Constants.SupportComputerShader)
+            FinalCS = UseComputeShader && Constants.SupportComputerShader;
+            Debug.Log($"Final Use Compute Shader:{FinalCS}");
+            if (FinalCS)
                 SetupComputerShader();
         }
+        private void OnDestroy()
+        {
+            try
+            {
+                CBPsis.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                CB_p_s.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                CB_q_s.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                CB_Rs.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                CB_USVs.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                OutNor.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                OutVert.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                vert.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+            try
+            {
+                nors.Dispose();
+            }
+            catch (System.Exception)
+            {
+            }
+        }
+        ComputeBuffer vert;
+        ComputeBuffer nors;
         void SetupComputerShader()
         {
             __KERNEL_FIRST_PASS = _CShader.FindKernel("FirstPass");
             __KERNEL_SECOND_PASS = _CShader.FindKernel("SecondPass");
-            ComputeBuffer vert = new ComputeBuffer(Vertices.Length, sizeof(float));
+            vert = new ComputeBuffer(Vertices.Length, sizeof(float) * 3);
+            nors = new ComputeBuffer(Vertices.Length, sizeof(float) * 3);
+            OutVert = new ComputeBuffer(Vertices.Length, sizeof(float) * 3);
+            OutNor = new ComputeBuffer(Vertices.Length, sizeof(float) * 3);
             vert.SetData(Vertices);
-            CBPsis = new ComputeBuffer(Vertices.Length, sizeof(float) * 4 * 4);
+            nors.SetData(Normals);
+            CBPsis = new ComputeBuffer(CurrentMesh.boneWeights.Length * 4, sizeof(float) * 4 * 4);
             CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
             Rs = new Float3x3[CurrentMesh.vertices.Length];
+            CB_q_s = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3);
+            CB_p_s = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3);
             CB_Rs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
             CB_USVs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
+            BoneMatrixs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 4 * 4);
             BoneBinding = new Float4[CurrentMesh.boneWeights.Length];
             BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(float) * 4);
+            q_s = new Float3[CurrentMesh.vertices.Length];
+            p_s = new Float3[CurrentMesh.vertices.Length];
+
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
-                BoneBinding[i].x = CurrentMesh.boneWeights[i].weight0;
-                BoneBinding[i].y = CurrentMesh.boneWeights[i].weight1;
-                BoneBinding[i].z = CurrentMesh.boneWeights[i].weight2;
-                BoneBinding[i].w = CurrentMesh.boneWeights[i].weight3;
+                BoneBinding[i] = new Float4
+                {
+                    x = CurrentMesh.boneWeights[i].weight0,
+                    y = CurrentMesh.boneWeights[i].weight1,
+                    z = CurrentMesh.boneWeights[i].weight2,
+                    w = CurrentMesh.boneWeights[i].weight3
+                };
+
             }
             BoneBindings.SetData(BoneBinding);
             USVs = new Float3x3[CurrentMesh.vertices.Length];
@@ -100,17 +187,21 @@ namespace DDM_Impl
             //CBPsis.Set()
             CB_USVs.SetData(USVs);
             CBPsis.SetData(CSPsis);
-            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "Vertices", vert);
+            //_CShader.SetBuffer(__KERNEL_FIRST_PASS, "Vertices", vert);
             _CShader.SetBuffer(__KERNEL_FIRST_PASS, "Psis", CBPsis);
             _CShader.SetBuffer(__KERNEL_FIRST_PASS, "BoneBinding", BoneBindings);
             _CShader.SetBuffer(__KERNEL_FIRST_PASS, "USVs", CB_USVs);
-            _CShader.SetBuffer(0, Shader.PropertyToID("BoneM"), BoneMatrixs);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "BoneM", BoneMatrixs);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "q_s", CB_q_s);
+            _CShader.SetBuffer(__KERNEL_FIRST_PASS, "p_s", CB_p_s);
 
             _CShader.SetBuffer(__KERNEL_SECOND_PASS, "Rs", CB_Rs);
-            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "q_s", CB_Rs);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "q_s", CB_q_s);
             _CShader.SetBuffer(__KERNEL_SECOND_PASS, "p_s", CB_p_s);
             _CShader.SetBuffer(__KERNEL_SECOND_PASS, "O_Vert", OutVert);
             _CShader.SetBuffer(__KERNEL_SECOND_PASS, "O_Nor", OutNor);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "Vertices", vert);
+            _CShader.SetBuffer(__KERNEL_SECOND_PASS, "Normals", nors);
         }
         Matrix<float> B;
         Matrix<float> A;
@@ -182,7 +273,6 @@ namespace DDM_Impl
                         }
                     }
                     Psis[i, 0] = Psi_i_0.Duplicate();
-                    Debug.Log($"R:{Psi_i_0.RowCount},C:{Psi_i_0.ColumnCount}");
                     Psis[i, 1] = Psi_i_1.Duplicate();
                     Psis[i, 2] = Psi_i_2.Duplicate();
                     Psis[i, 3] = Psi_i_3.Duplicate();
@@ -201,7 +291,7 @@ namespace DDM_Impl
         Matrix<float> pt = Matrix<float>.Build.Dense(1, 3);
         Matrix<float> p = Matrix<float>.Build.Dense(3, 1);
         Matrix<float> q = Matrix<float>.Build.Dense(3, 1);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         void OnComputeShader()
         {
             for (int i = 0; i < Bones.Length; i++)
@@ -210,25 +300,65 @@ namespace DDM_Impl
                 boneM[i].ToMatrix(boneM_[i]);
             }
             //First Pass
+
             BoneMatrixs.SetData(boneM);
 
             _CShader.Dispatch(__KERNEL_FIRST_PASS, Vertices.Length, 1, 1);
             //Managed Pass
-
             CB_USVs.GetData(USVs);
+
+            CB_p_s.GetData(p_s);
+            CB_q_s.GetData(q_s);
+            int ErrorCount = 0;
             for (int i = 0; i < USVs.Length; i++)
             {
-                var svd = USVs[i].ToMatrix().Svd();
-                Rs[i] = Float3x3.FromMatrix(svd.U * svd.VT);
+                try
+                {
+                    var USV = USVs[i].ToMatrix();
+                    var svd = USV.Svd();
+                    //Debug.Log(USV);
+                    //Rs[i] = Float3x3.FromMatrix(svd.U * svd.VT);
+                    var q = q_s[i].ToVertical();
+                    var p = q_s[i].ToVertical();
+                    var R = svd.U * svd.VT;
+                    var T = q - R * p;
+                    Matrix4x4 trans = Matrix4x4.zero;
+                    for (int x = 0; x < 3; x++)
+                    {
+                        for (int y = 0; y < 3; y++)
+                        {
+                            trans[x, y] = R[x, y];
+                        }
+                    }
+                    trans[0, 3] = T[0, 0];
+                    trans[1, 3] = T[1, 0];
+                    trans[2, 3] = T[2, 0];
+                    trans[3, 3] = 1;
+
+                    AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
+                    AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
+                }
+                catch (System.Exception)
+                {
+                    ErrorCount++;
+                }
             }
-            CB_Rs.SetData(Rs);
-            //
-            _CShader.Dispatch(__KERNEL_SECOND_PASS, Vertices.Length, 1, 1);
-            //OutVert.GetData()
+            //Debug.Log($"Error Count : {ErrorCount} out of {USVs.Length} USVs.");
+            //CB_Rs.SetData(Rs);
+            //CB_p_s.SetData(p_s);
+            //CB_q_s.SetData(q_s);
+            ////
+            //_CShader.Dispatch(__KERNEL_SECOND_PASS, Vertices.Length, 1, 1);
+            //OutVert.GetData(AlteredVertices);
+            //OutNor.GetData(AlteredNormals);
+
+            CurrentMesh.vertices = AlteredVertices;
+            CurrentMesh.normals = AlteredNormals;
+            Graphics.DrawMesh(CurrentMesh, Matrix4x4.identity, TargetSMR.sharedMaterial, 0);
         }
         void OnFrame()
         {
-            if (UseComputeShader && Constants.SupportComputerShader)
+            if (FinalCS)
             {
                 OnComputeShader();
                 return;
@@ -266,7 +396,6 @@ namespace DDM_Impl
                 {
                     MathNet.Numerics.LinearAlgebra.Factorization.Svd<float> SVD = USV.Svd();
                     var R = SVD.U * SVD.VT;
-
                     var T = q - R * p;
                     Matrix4x4 trans = Matrix4x4.zero;
                     for (int x = 0; x < 3; x++)
