@@ -297,7 +297,7 @@ namespace DDM_Impl
             for (int i = 0; i < Bones.Length; i++)
             {
                 boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
-                boneM[i].ToMatrix(boneM_[i]);
+                //boneM[i].ToMatrix(boneM_[i]);
             }
             //First Pass
 
@@ -307,8 +307,8 @@ namespace DDM_Impl
             //Managed Pass
             CB_USVs.GetData(USVs);
 
-            CB_p_s.GetData(p_s);
-            CB_q_s.GetData(q_s);
+            //CB_p_s.GetData(p_s);
+            //CB_q_s.GetData(q_s);
             int ErrorCount = 0;
             for (int i = 0; i < USVs.Length; i++)
             {
@@ -317,26 +317,27 @@ namespace DDM_Impl
                     var USV = USVs[i].ToMatrix();
                     var svd = USV.Svd();
                     //Debug.Log(USV);
-                    //Rs[i] = Float3x3.FromMatrix(svd.U * svd.VT);
-                    var q = q_s[i].ToVertical();
-                    var p = q_s[i].ToVertical();
-                    var R = svd.U * svd.VT;
-                    var T = q - R * p;
-                    Matrix4x4 trans = Matrix4x4.zero;
-                    for (int x = 0; x < 3; x++)
-                    {
-                        for (int y = 0; y < 3; y++)
-                        {
-                            trans[x, y] = R[x, y];
-                        }
-                    }
-                    trans[0, 3] = T[0, 0];
-                    trans[1, 3] = T[1, 0];
-                    trans[2, 3] = T[2, 0];
-                    trans[3, 3] = 1;
+                    Rs[i] = Float3x3.FromMatrix(svd.U * svd.VT);
+                    //var q = q_s[i].ToVertical();
+                    //var p = p_s[i].ToVertical();
+                    //var R = svd.U * svd.VT;
+                    //var T = q - R * p;
+                    //Matrix4x4 trans = Matrix4x4.zero;
+                    //for (int x = 0; x < 3; x++)
+                    //{
+                    //    for (int y = 0; y < 3; y++)
+                    //    {
+                    //        trans[x, y] = R[x, y];
+                    //    }
+                    //}
+                    //trans[0, 3] = T[0, 0];
+                    //trans[1, 3] = T[1, 0];
+                    //trans[2, 3] = T[2, 0];
+                    //trans[3, 3] = 1;
 
-                    AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
-                    AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
+                    //AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
+                    //AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
+                    //Debug.Log(AlteredVertices[i]);
                 }
                 catch (System.Exception)
                 {
@@ -344,13 +345,13 @@ namespace DDM_Impl
                 }
             }
             //Debug.Log($"Error Count : {ErrorCount} out of {USVs.Length} USVs.");
-            //CB_Rs.SetData(Rs);
+            CB_Rs.SetData(Rs);
             //CB_p_s.SetData(p_s);
             //CB_q_s.SetData(q_s);
-            ////
-            //_CShader.Dispatch(__KERNEL_SECOND_PASS, Vertices.Length, 1, 1);
-            //OutVert.GetData(AlteredVertices);
-            //OutNor.GetData(AlteredNormals);
+            //
+            _CShader.Dispatch(__KERNEL_SECOND_PASS, Vertices.Length, 1, 1);
+            OutVert.GetData(AlteredVertices);
+            OutNor.GetData(AlteredNormals);
 
             CurrentMesh.vertices = AlteredVertices;
             CurrentMesh.normals = AlteredNormals;

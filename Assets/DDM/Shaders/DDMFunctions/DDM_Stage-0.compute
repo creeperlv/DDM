@@ -19,16 +19,13 @@ RWStructuredBuffer<float3x3> USVs;
 StructuredBuffer<float3x3> Rs;
 RWStructuredBuffer<float3x1> q_s;
 RWStructuredBuffer<float3x1> p_s;
-float3x3 Multiply(float3x1 A, float1x3 B)
+float3x3 Multiply(float3x1 A, float3 B)
 {
-    float3x3 USV;
-    
+    float3x3 Result;
     for (int y = 0; y < 3; y++)
         for (int x = 0; x < 3; x++)
-        {
-            USV[x][y] = A[x][0] * B[0][y];
-        }
-    return USV;
+            Result[x][y] = A[x][0] * B[y];
+    return Result;
 }
 [numthreads(MAX_X, 1, 1)]
 void FirstPass(uint3 id : SV_DispatchThreadID)
@@ -39,19 +36,21 @@ void FirstPass(uint3 id : SV_DispatchThreadID)
     float4x4 Psi1 = Psis[id.x * 4 + 1];
     float4x4 Psi2 = Psis[id.x * 4 + 2];
     float4x4 Psi3 = Psis[id.x * 4 + 3];
-    float4x4 B0 = BoneM[vertBB.x];
-    float4x4 B1 = BoneM[vertBB.y];
-    float4x4 B2 = BoneM[vertBB.z];
-    float4x4 B3 = BoneM[vertBB.w];
-    float4x4 Omega = B0 * Psi0 + B1 * Psi1
-    + B2 * Psi1 + B3 * Psi3;
+    float4x4 B0   = BoneM[vertBB.x];
+    float4x4 B1   = BoneM[vertBB.y];
+    float4x4 B2   = BoneM[vertBB.z];
+    float4x4 B3   = BoneM[vertBB.w];
+    float4x4 Omega = B0 * Psi0 +
+                     B1 * Psi1 +
+                     B2 * Psi2 +
+                     B3 * Psi3;
     float3x3 Q;
     for (int x = 0; x < 3; x++)
         for (int y = 0; y < 3; y++)
             Q[x][y] = Omega[x][y];
-    float3x1 q = float3x1(Omega[0][0], Omega[1][0], Omega[2][0]);
-    float1x3 pT = float1x3(Omega[3][0], Omega[3][1], Omega[3][2]);
-    float3x1 p = float3x1(Omega[3][0], Omega[3][1], Omega[3][2]);
+    float3x1 q = float3x1(Omega[0][3], Omega[1][3], Omega[2][3]);
+    float3 pT = float3(Omega[3][0], Omega[3][1], Omega[3][2]);
+    float3 p = float3(Omega[3][0], Omega[3][1], Omega[3][2]);
     USVs[id.x] = Q - Multiply(q, pT);
     q_s[id.x] = q;
     p_s[id.x] = p;
@@ -73,7 +72,14 @@ float3 Float4x4ByFloat3__(float4x4 L, float3 R)
     result.z = L[2][0] * R.x + L[2][1] * R.y + L[2][2] * R.z; // + L[2][3];
     return result;
 }
-[numthreads(MAX_X, 4, 1)]
+
+float3x1 Cross(float3x3 A, float3x1 B)
+{
+    return float3x1(A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[0][0],
+                    A[1][0] * B[1][0] + A[1][1] * B[1][0] + A[1][2] * B[1][0],
+                    A[2][0] * B[2][0] + A[2][1] * B[2][0] + A[2][2] * B[2][0]);
+}
+[numthreads(MAX_X, 1, 1)]
 void SecondPass(uint3 id : SV_DispatchThreadID)
 {
     float4x4 Trans;
@@ -81,12 +87,11 @@ void SecondPass(uint3 id : SV_DispatchThreadID)
     for (int x = 0; x < 3; x++)
         for (int y = 0; y < 3; y++)
             Trans[x][y] = R[x][y];
-    float3x1 T = q_s[id.x] - R * p_s[id.x];
+    float3x1 T = q_s[id.x] - Cross(R, p_s[id.x]);
     Trans[0][3] = T[0];
     Trans[1][3] = T[1];
     Trans[2][3] = T[2];
     Trans[3][3] = 1;
     O_Vert[id.x] = Float4x4ByFloat3(Trans, Vertices[id.x]);
     O_Nor[id.x] = Float4x4ByFloat3__(Trans, Normals[id.x]);
-
 }
