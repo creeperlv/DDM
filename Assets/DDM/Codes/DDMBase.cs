@@ -33,7 +33,7 @@ namespace DDM_Impl
         Vector3[] AlteredVertices;
         Vector3[] AlteredNormals;
         Transform[] Bones;
-        Float4[] BoneBinding;
+        Int4[] BoneBinding;
         Float3[] q_s;
         Float3[] p_s;
         int __KERNEL_FIRST_PASS;
@@ -151,37 +151,38 @@ namespace DDM_Impl
             OutNor = new ComputeBuffer(Vertices.Length, sizeof(float) * 3);
             vert.SetData(Vertices);
             nors.SetData(Normals);
-            CBPsis = new ComputeBuffer(CurrentMesh.boneWeights.Length * 4, sizeof(float) * 4 * 4);
+            boneM__RowFirst = new RowFirstFloat4x4[boneM.Length];
             CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
+            CBPsis = new ComputeBuffer(CurrentMesh.boneWeights.Length * 4, sizeof(float) * 4 * 4);
             Rs = new Float3x3[CurrentMesh.vertices.Length];
             CB_q_s = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3);
             CB_p_s = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3);
             CB_Rs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
             CB_USVs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3 * 3);
-            BoneMatrixs = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 4 * 4);
-            BoneBinding = new Float4[CurrentMesh.boneWeights.Length];
-            BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(float) * 4);
+            BoneMatrixs = new ComputeBuffer(Bones.Length, sizeof(float) * 4 * 4);
+            BoneBinding = new Int4[CurrentMesh.boneWeights.Length];
+            BoneBindings = new ComputeBuffer(BoneBinding.Length, sizeof(int) * 4);
             q_s = new Float3[CurrentMesh.vertices.Length];
             p_s = new Float3[CurrentMesh.vertices.Length];
 
             for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
             {
-                BoneBinding[i] = new Float4
-                {
-                    x = CurrentMesh.boneWeights[i].weight0,
-                    y = CurrentMesh.boneWeights[i].weight1,
-                    z = CurrentMesh.boneWeights[i].weight2,
-                    w = CurrentMesh.boneWeights[i].weight3
-                };
+                BoneBinding[i] = new Int4(CurrentMesh.boneWeights[i].boneIndex0,
+                                            CurrentMesh.boneWeights[i].boneIndex1,
+                                            CurrentMesh.boneWeights[i].boneIndex2,
+                                            CurrentMesh.boneWeights[i].boneIndex3);
 
             }
             BoneBindings.SetData(BoneBinding);
             USVs = new Float3x3[CurrentMesh.vertices.Length];
-            for (int i = 0; i < CurrentMesh.boneWeights.Length; i++)
+            for (int i = 0; i < CurrentMesh.vertices.Length; i++)
             {
-                for (int x = 0; x < 4; x++)
+                //for (int x = 0; x < 4; x++)
                 {
-                    CSPsis[i * 4 + x] = Psis[i, x].ToMatrix();
+                    CSPsis[i * 4 + 0] = (Psis[i, 0].ToMatrix());
+                    CSPsis[i * 4 + 1] = (Psis[i, 1].ToMatrix());
+                    CSPsis[i * 4 + 2] = (Psis[i, 2].ToMatrix());
+                    CSPsis[i * 4 + 3] = (Psis[i, 3].ToMatrix());
                 }
             }
             //CBPsis.Set()
@@ -285,6 +286,7 @@ namespace DDM_Impl
             OnFrame();
         }
         Matrix4x4[] boneM;
+        RowFirstFloat4x4[] boneM__RowFirst;
         Float3x3[] Rs;
         Matrix<float>[] boneM_;
         Matrix<float> Q = Matrix<float>.Build.Dense(3, 3);
@@ -296,7 +298,8 @@ namespace DDM_Impl
         {
             for (int i = 0; i < Bones.Length; i++)
             {
-                boneM[i] = Bones[i].GlobalToMatrix() * BindPoses[i];
+                boneM[i] = (Bones[i].GlobalToMatrix() * BindPoses[i]);
+                boneM__RowFirst[i] = RowFirstFloat4x4.FromMatrix(boneM[i]);
                 //boneM[i].ToMatrix(boneM_[i]);
             }
             //First Pass
@@ -337,7 +340,7 @@ namespace DDM_Impl
 
                     //AlteredVertices[i] = trans.MultiplyPoint3x4(Vertices[i]);
                     //AlteredNormals[i] = trans.MultiplyVector(Normals[i]);
-                    //Debug.Log(AlteredVertices[i]);
+                    ////Debug.Log(AlteredVertices[i]);
                 }
                 catch (System.Exception)
                 {
@@ -391,13 +394,18 @@ namespace DDM_Impl
                 pt[0, 0] = Omega[3, 0];
                 pt[0, 1] = Omega[3, 1];
                 pt[0, 2] = Omega[3, 2];
-                pt.Transpose(p);
+                p[0, 0] = Omega[3, 0];
+                p[1, 0] = Omega[3, 1];
+                p[2, 0] = Omega[3, 2];
+                //pt.Transpose(p);
                 var USV = Q - q * pt;
+                //Debug.Log(USV);
                 try
                 {
                     MathNet.Numerics.LinearAlgebra.Factorization.Svd<float> SVD = USV.Svd();
                     var R = SVD.U * SVD.VT;
                     var T = q - R * p;
+                    Debug.Log(T);
                     Matrix4x4 trans = Matrix4x4.zero;
                     for (int x = 0; x < 3; x++)
                     {

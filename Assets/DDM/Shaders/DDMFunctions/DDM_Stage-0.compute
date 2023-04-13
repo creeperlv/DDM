@@ -1,14 +1,14 @@
 // Each #kernel tells which function to compile; you can have many kernels
+//#pragma pack_matrix column_major 
 #pragma kernel FirstPass
 #pragma kernel SecondPass
 #define MAX_X 256
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
-RWTexture2D<float4> Result;
 //IN
 
 StructuredBuffer<float4x4> BoneM;
-StructuredBuffer<float4> BoneBinding; //Per Vertex
+StructuredBuffer<int4> BoneBinding; //Per Vertex
 StructuredBuffer<float3> Vertices;
 StructuredBuffer<float3> Normals;
 StructuredBuffer<float4x4> Psis;
@@ -19,38 +19,69 @@ RWStructuredBuffer<float3x3> USVs;
 StructuredBuffer<float3x3> Rs;
 RWStructuredBuffer<float3x1> q_s;
 RWStructuredBuffer<float3x1> p_s;
-float3x3 Multiply(float3x1 A, float3 B)
+float3x3 Multiply(float3 A, float3 B)
 {
-    float3x3 Result;
-    for (int y = 0; y < 3; y++)
-        for (int x = 0; x < 3; x++)
-            Result[x][y] = A[x][0] * B[y];
-    return Result;
+    //float3x3 Result;
+    //for (int x = 0; x < 3; x++)
+    //    for (int y = 0; y < 3; y++)
+    //        Result[x][y] = A[x][0] * B[y];
+    return float3x3(A[0] * B[0], A[0] * B[1], A[0] * B[2],
+                    A[1] * B[0], A[1] * B[1], A[1] * B[2],
+                    A[2] * B[0], A[2] * B[1], A[2] * B[2]);
+}
+float4x4 Cross_4x4_4x4(float4x4 L, float4x4 R)
+{
+    float4x4 result;
+    for (int x = 0; x < 4; x++)
+    {
+        for (int y = 0; y < 4; y++)
+        {
+            result[x][y] = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                result[x][y] += L[x][i] * R[y][i];
+            }
+        }
+    }
+    return result;
 }
 [numthreads(MAX_X, 1, 1)]
 void FirstPass(uint3 id : SV_DispatchThreadID)
 {
-    float4 vertBB = BoneBinding[id.x];
-    //float4x4 Psi = Psis[id.x];
-    float4x4 Psi0 = Psis[id.x * 4 + 0];
-    float4x4 Psi1 = Psis[id.x * 4 + 1];
-    float4x4 Psi2 = Psis[id.x * 4 + 2];
-    float4x4 Psi3 = Psis[id.x * 4 + 3];
-    float4x4 B0   = BoneM[vertBB.x];
-    float4x4 B1   = BoneM[vertBB.y];
-    float4x4 B2   = BoneM[vertBB.z];
-    float4x4 B3   = BoneM[vertBB.w];
-    float4x4 Omega = B0 * Psi0 +
-                     B1 * Psi1 +
-                     B2 * Psi2 +
-                     B3 * Psi3;
-    float3x3 Q;
-    for (int x = 0; x < 3; x++)
-        for (int y = 0; y < 3; y++)
-            Q[x][y] = Omega[x][y];
-    float3x1 q = float3x1(Omega[0][3], Omega[1][3], Omega[2][3]);
-    float3 pT = float3(Omega[3][0], Omega[3][1], Omega[3][2]);
-    float3 p = float3(Omega[3][0], Omega[3][1], Omega[3][2]);
+    int4 vertBB = BoneBinding[id.x];
+    int Bind0 = vertBB[0];
+    int Bind1 = vertBB[1];
+    int Bind2 = vertBB[2];
+    int Bind3 = vertBB[3];
+    int BaseIndex4 = id.x * 4;
+    int PID0 = BaseIndex4;
+    int PID1 = BaseIndex4 + 1;
+    int PID2 = BaseIndex4 + 2;
+    int PID3 = BaseIndex4 + 3;
+    float4x4 Psi0 = Psis[PID0];
+    float4x4 Psi1 = Psis[PID1];
+    float4x4 Psi2 = Psis[PID2];
+    float4x4 Psi3 = Psis[PID3];
+    float4x4 B0 = BoneM[Bind0];
+    float4x4 B1 = BoneM[Bind0];
+    float4x4 B2 = BoneM[Bind0];
+    float4x4 B3 = BoneM[Bind0];
+    //Omega
+    float4x4 O =
+    Cross_4x4_4x4(B0, Psi0) +
+                 Cross_4x4_4x4(B1, Psi1) +
+                 Cross_4x4_4x4(B2, Psi2) +
+                 Cross_4x4_4x4(B3, Psi3);
+    float3x3 Q = float3x3(O[0][0], O[0][1], O[0][2],
+                          O[1][0], O[1][1], O[1][2],
+                          O[2][0], O[2][1], O[2][2]);
+    float3x1 q = float3x1(O[0][3],
+                          O[1][3],
+                          O[2][3]);
+    float3 pT = float3(O[3][0],
+                       O[3][1],
+                       O[3][2]);
+    float3 p = float3(O[3][0], O[3][1], O[3][2]);
     USVs[id.x] = Q - Multiply(q, pT);
     q_s[id.x] = q;
     p_s[id.x] = p;
@@ -75,6 +106,19 @@ float3 Float4x4ByFloat3__(float4x4 L, float3 R)
 
 float3x1 Cross(float3x3 A, float3x1 B)
 {
+    //float3x1 result;
+    //for (int x = 0; x < 3; x++)
+    //{
+    //    result[x] = 0;
+    //    for (int y = 0; y < 3; y++)
+    //    {
+    //        result[x] += A[x][y] * B[x];
+    //        //for (int i = 0; i < 3; i++)
+    //        //{
+    //        //}
+    //    }
+    //}
+    //return result;
     return float3x1(A[0][0] * B[0][0] + A[0][1] * B[1][0] + A[0][2] * B[0][0],
                     A[1][0] * B[1][0] + A[1][1] * B[1][0] + A[1][2] * B[1][0],
                     A[2][0] * B[2][0] + A[2][1] * B[2][0] + A[2][2] * B[2][0]);
@@ -83,11 +127,15 @@ float3x1 Cross(float3x3 A, float3x1 B)
 void SecondPass(uint3 id : SV_DispatchThreadID)
 {
     float4x4 Trans;
+    Trans[3][0] = 0;
+    Trans[3][1] = 0;
+    Trans[3][2] = 0;
     float3x3 R = Rs[id.x];
     for (int x = 0; x < 3; x++)
         for (int y = 0; y < 3; y++)
             Trans[x][y] = R[x][y];
-    float3x1 T = q_s[id.x] - Cross(R, p_s[id.x]);
+    float3x1 T = q_s[id.x] - R* p_s[id.x];
+    //Cross(R, p_s[id.x]);
     Trans[0][3] = T[0];
     Trans[1][3] = T[1];
     Trans[2][3] = T[2];
