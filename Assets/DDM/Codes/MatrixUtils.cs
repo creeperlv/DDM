@@ -50,7 +50,7 @@ namespace DDM_Impl
         }
         public static Matrix<float>[,] Duplicate(this Matrix<float>[,] m)
         {
-            Matrix<float>[,] res=new Matrix<float>[m.GetLength(0), m.GetLength(1)];
+            Matrix<float>[,] res = new Matrix<float>[m.GetLength(0), m.GetLength(1)];
             for (int x = 0; x < m.GetLength(0); x++)
             {
                 for (int y = 0; y < m.GetLength(1); y++)
@@ -62,12 +62,12 @@ namespace DDM_Impl
         }
         public static Matrix<float> Duplicate(this Matrix<float> m)
         {
-            var res=Matrix<float>.Build.SameAs(m);
+            var res = Matrix<float>.Build.SameAs(m);
             for (int x = 0; x < m.RowCount; x++)
             {
                 for (int y = 0; y < m.ColumnCount; y++)
                 {
-                    res[x,y] = m[x, y];
+                    res[x, y] = m[x, y];
                 }
             }
             return res;
@@ -108,7 +108,7 @@ namespace DDM_Impl
                         if (dx * dx + dy * dy + dz * dz <= minSqrDistance)
                         {
                             if (mapToUnique[i] == -1)
-                                mapToUnique[i] = u; 
+                                mapToUnique[i] = u;
                             mapToUnique[j] = u;
                         }
                     }
@@ -179,9 +179,9 @@ namespace DDM_Impl
                         {
                             break;
                         }
-                        lapl[vi, vj]= lapl[vi, vj] / viDeg;
+                        lapl[vi, vj] = lapl[vi, vj] / viDeg;
                     }
-                    lapl[vi, vi]= 1.0f;
+                    lapl[vi, vi] = 1.0f;
                 }
 
             }
@@ -218,7 +218,7 @@ namespace DDM_Impl
                 }
             }
         }
-        public static Matrix4x4 ToMatrix(this Matrix<float>  m)
+        public static Matrix4x4 ToMatrix(this Matrix<float> m)
         {
             Matrix4x4 result = new Matrix4x4();
             for (int x = 0; x < 4; x++)

@@ -1,6 +1,7 @@
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Single;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,7 @@ namespace DDM_Impl
     {
         public SkinnedMeshRenderer TargetSMR;
         public ComputeShader _CShader;
+        public TextAsset Precomputed;
         ComputeBuffer OutVert;
         ComputeBuffer OutNor;
         ComputeBuffer CB_Rs;
@@ -67,8 +69,13 @@ namespace DDM_Impl
             {
                 boneM_[i] = Matrix<float>.Build.Dense(4, 4);
             }
-            Precompute();
             FinalCS = UseComputeShader && Constants.SupportComputerShader;
+            if (Precomputed == null)
+                Precompute();
+            else
+            {
+                LoadBaked();
+            }
             Debug.Log($"Final Use Compute Shader:{FinalCS}");
             if (FinalCS)
                 SetupComputerShader();
@@ -152,7 +159,21 @@ namespace DDM_Impl
             vert.SetData(Vertices);
             nors.SetData(Normals);
             boneM__RowFirst = new RowFirstFloat4x4[boneM.Length];
-            CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
+            if (CSPsis == null)
+            {
+                CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
+
+                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+                {
+                    //for (int x = 0; x < 4; x++)
+                    {
+                        CSPsis[i * 4 + 0] = (Psis[i, 0].ToMatrix());
+                        CSPsis[i * 4 + 1] = (Psis[i, 1].ToMatrix());
+                        CSPsis[i * 4 + 2] = (Psis[i, 2].ToMatrix());
+                        CSPsis[i * 4 + 3] = (Psis[i, 3].ToMatrix());
+                    }
+                }
+            }
             CBPsis = new ComputeBuffer(CurrentMesh.boneWeights.Length * 4, sizeof(float) * 4 * 4);
             Rs = new Float3x3[CurrentMesh.vertices.Length];
             CB_q_s = new ComputeBuffer(CurrentMesh.vertices.Length, sizeof(float) * 3);
@@ -175,16 +196,6 @@ namespace DDM_Impl
             }
             BoneBindings.SetData(BoneBinding);
             USVs = new Float3x3[CurrentMesh.vertices.Length];
-            for (int i = 0; i < CurrentMesh.vertices.Length; i++)
-            {
-                //for (int x = 0; x < 4; x++)
-                {
-                    CSPsis[i * 4 + 0] = (Psis[i, 0].ToMatrix());
-                    CSPsis[i * 4 + 1] = (Psis[i, 1].ToMatrix());
-                    CSPsis[i * 4 + 2] = (Psis[i, 2].ToMatrix());
-                    CSPsis[i * 4 + 3] = (Psis[i, 3].ToMatrix());
-                }
-            }
             //CBPsis.Set()
             CB_USVs.SetData(USVs);
             CBPsis.SetData(CSPsis);
@@ -209,14 +220,138 @@ namespace DDM_Impl
         Matrix<float> A_p;
         Matrix<float> B_p;
         Matrix<float>[,] Psis;
-        Matrix4x4[] CSPsis;
-        void Precompute()
+        Matrix4x4[] CSPsis = null;
+        public void Precompute()
         {
             CalcuateNormalizedLaplace();
 
             CalcBMatrix(Lambda);
             BuildUs();
             CalcPsis();
+        }
+        void LoadBaked()
+        {
+            var floats = Precomputed.bytes.Length / sizeof(float);
+            var data = Precomputed.bytes;
+            if (FinalCS)
+            {
+                var matrix_count = floats / 16;
+                CSPsis = new Matrix4x4[CurrentMesh.boneWeights.Length * 4];
+                int POINTER = 0;
+                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+                {
+                    //for (int x = 0; x < 4; x++)
+                    {
+                        {
+                            Matrix4x4 M = new Matrix4x4();
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            CSPsis[i * 4 + 0] = M;
+                        }
+                        {
+                            Matrix4x4 M = new Matrix4x4();
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            CSPsis[i * 4 + 1] = M;
+                        }
+                        {
+                            Matrix4x4 M = new Matrix4x4();
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            CSPsis[i * 4 + 2] = M;
+                        }
+                        {
+                            Matrix4x4 M = new Matrix4x4();
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            CSPsis[i * 4 + 3] = M;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+                int POINTER = 0;
+                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+                {
+                    //for (int x = 0; x < 4; x++)
+                    {
+                        {
+                            Matrix<float> M = Matrix<float>.Build.Dense(4,4);
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            Psis[i * 4 , 0] = M;
+                        }
+                        {
+                            Matrix<float> M = Matrix<float>.Build.Dense(4, 4);
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            Psis[i * 4, 1] = M;
+                        }
+                        {
+                            Matrix<float> M = Matrix<float>.Build.Dense(4, 4);
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            Psis[i * 4, 2] = M;
+                        }
+                        {
+                            Matrix<float> M = Matrix<float>.Build.Dense(4, 4);
+                            for (int x = 0; x < 4; x++)
+                            {
+                                for (int y = 0; y < 4; y++)
+                                {
+                                    M[x, y] = BitConverter.ToSingle(data, POINTER);
+                                    POINTER += 4;
+                                }
+                            }
+                            Psis[i * 4, 3] = M;
+                        }
+                    }
+                }
+            }
         }
         void CalcPsis()
         {
