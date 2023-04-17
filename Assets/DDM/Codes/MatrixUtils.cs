@@ -19,8 +19,8 @@ namespace DDM_Impl
         public static int[,] BuildAdjacencyMatrix(Vector3[] v, int[] t, int MAX_WIDTH, float MIN_DIST = 0.00001f)
         {
             var adj = new int[v.Length, MAX_WIDTH];
-            for (int i = 0; i < adj.GetLength(0); ++i)
-                for (int j = 0; j < adj.GetLength(1); ++j)
+            for (int i = 0; i < v.Length; ++i)
+                for (int j = 0; j < MAX_WIDTH; ++j)
                     adj[i, j] = -1;
 
             if (MIN_DIST == 0.0f)
@@ -95,7 +95,9 @@ namespace DDM_Impl
                 mapToUnique[i] = -1;
 
             for (int i = 0; i < v.Length; i++)
+            {
                 for (int j = i; j < v.Length; j++)
+                {
                     if (mapToUnique[j] == -1)
                     {
                         var u = mapToUnique[i];
@@ -112,7 +114,8 @@ namespace DDM_Impl
                             mapToUnique[j] = u;
                         }
                     }
-
+                }
+            }
 
             return mapToUnique;
         }

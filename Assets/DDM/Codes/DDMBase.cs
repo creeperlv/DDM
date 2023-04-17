@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
 using UnityEngine;
+using static UnityEditor.Searcher.SearcherWindow.Alignment;
+
 namespace DDM_Impl
 {
     public class DDMBase : MonoBehaviour
@@ -71,7 +73,12 @@ namespace DDM_Impl
             }
             FinalCS = UseComputeShader && Constants.SupportComputerShader;
             if (Precomputed == null)
+            {
+                triangles = CurrentMesh.triangles;
+                BoneWeights = CurrentMesh.boneWeights;  
                 Precompute();
+                triangles = null;
+            }
             else
             {
                 LoadBaked();
@@ -219,10 +226,30 @@ namespace DDM_Impl
         Matrix<float> A;
         Matrix<float> A_p;
         Matrix<float> B_p;
-        Matrix<float>[,] Psis;
+        public Matrix<float>[,] Psis;
         Matrix4x4[] CSPsis = null;
+        [HideInInspector]
+        public int PROG__STAGE = 0;
+        [HideInInspector]
+        public int PROG__VALUE = 0;
+        [HideInInspector]
+        public int PROG__MAX = 0;
+        BoneWeight[] BoneWeights;
+        public void PreBake()
+        {
+
+            CurrentMesh = (TargetSMR.sharedMesh);
+            BoneWeights=CurrentMesh.boneWeights;
+            triangles = CurrentMesh.triangles;
+            if (Vertices == null)
+                Vertices = CurrentMesh.vertices;
+
+            if (Normals == null)
+                Normals = CurrentMesh.normals;
+        }
         public void Precompute()
         {
+            PROG__STAGE = 0;
             CalcuateNormalizedLaplace();
 
             CalcBMatrix(Lambda);
@@ -302,7 +329,7 @@ namespace DDM_Impl
                     //for (int x = 0; x < 4; x++)
                     {
                         {
-                            Matrix<float> M = Matrix<float>.Build.Dense(4,4);
+                            Matrix<float> M = Matrix<float>.Build.Dense(4, 4);
                             for (int x = 0; x < 4; x++)
                             {
                                 for (int y = 0; y < 4; y++)
@@ -311,7 +338,7 @@ namespace DDM_Impl
                                     POINTER += 4;
                                 }
                             }
-                            Psis[i * 4 , 0] = M;
+                            Psis[i * 4, 0] = M;
                         }
                         {
                             Matrix<float> M = Matrix<float>.Build.Dense(4, 4);
@@ -356,17 +383,19 @@ namespace DDM_Impl
         void CalcPsis()
         {
             //Debug.Log($"u_:Row->{u_.RowCount},Column->{u_.ColumnCount}");
-            Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
-            Matrix<float>[,] _Psis = new Matrix<float>[CurrentMesh.boneWeights.Length, 4];
+            Psis = new Matrix<float>[BoneWeights.Length, 4];
+            Matrix<float>[,] _Psis = new Matrix<float>[BoneWeights.Length, 4];
 
             Matrix<float> Psi_i_0;
             Matrix<float> Psi_i_1;
             Matrix<float> Psi_i_2;
             Matrix<float> Psi_i_3;
-            for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+            PROG__VALUE = 0;
+            PROG__MAX = Vertices.Length * (iterations + 1);
+            for (int i = 0; i < Vertices.Length; i++)
             {
                 {
-                    var wei = CurrentMesh.boneWeights[i];
+                    var wei = BoneWeights[i];
                     var u_col = u_.Row(i);
                     var u_k_calced = u_col.OuterProduct(u_col);
                     {
@@ -376,6 +405,7 @@ namespace DDM_Impl
                         Psis[i, 3] = (wei.weight3 * u_k_calced);// [0, 0];
                     }
                 }
+                PROG__VALUE++;
                 //Psis[i, 0] = Psi_i_0.Duplicate();
                 //Psis[i, 1] = Psi_i_1.Duplicate();
                 //Psis[i, 2] = Psi_i_2.Duplicate();
@@ -387,7 +417,7 @@ namespace DDM_Impl
                 _Psis = Psis.Duplicate();
                 Psis = tmp;
                 //Psis = tmp;
-                for (int i = 0; i < CurrentMesh.vertices.Length; i++)
+                for (int i = 0; i < Vertices.Length; i++)
                 {
                     // i : i;
                     {
@@ -396,7 +426,7 @@ namespace DDM_Impl
                         Psi_i_2 = Matrix<float>.Build.Dense(4, 4, 0);
                         Psi_i_3 = Matrix<float>.Build.Dense(4, 4, 0);
                     }
-                    for (int k = 0; k < CurrentMesh.vertices.Length; k++)
+                    for (int k = 0; k < Vertices.Length; k++)
                     {
                         var AorB = B_p[i, k];
                         if (AorB != 0f)
@@ -412,8 +442,10 @@ namespace DDM_Impl
                     Psis[i, 1] = Psi_i_1.Duplicate();
                     Psis[i, 2] = Psi_i_2.Duplicate();
                     Psis[i, 3] = Psi_i_3.Duplicate();
+                    PROG__VALUE++;
                 }
             }
+            PROG__STAGE++;
         }
         // Update is called once per frame
         void Update()
@@ -594,6 +626,8 @@ namespace DDM_Impl
             //var DL = Matrix<float>.Build.DiagonalIdentity(w, h) * Lambda;
             B = (Matrix<float>.Build.DiagonalIdentity(w, h) - (Lambda * LaplacianMatrix));//.Transpose(); //* DL);
             B_p = B;
+            PROG__VALUE = 0;
+            PROG__STAGE++;
             return;
             //B_p = Matrix<float>.Build.DiagonalIdentity(w, h);// + (Lambda * LaplacianMatrix); //* DL);
             //for (int i = 0; i < iterations; i++)
@@ -619,7 +653,7 @@ namespace DDM_Impl
 
             //}
             //var bw = CurrentMesh.boneWeights;
-            var vert = CurrentMesh.vertices;
+            var vert = Vertices;
             u__ = new Matrix<float>[vert.Length];
             u_ = Matrix<float>.Build.Sparse(vert.Length, 4);
             //v_ = Matrix<float>.Build.Sparse(vert.Length, 4);
@@ -628,6 +662,8 @@ namespace DDM_Impl
             //_Smooth_vs_mat = Matrix<float>.Build.Sparse(vert.Length, 4);
             //Matrix<float>[] us = new Matrix<float>[vert.Length];
             //_Smooth_us = Matrix<float>.Build.Sparse(vert.Length, 4);
+            PROG__VALUE = 0;
+            PROG__MAX = vert.Length;
             for (int i = 0; i < vert.Length; i++)
             {
                 //var bw_i = bw[i];
@@ -635,19 +671,10 @@ namespace DDM_Impl
 
                 Matrix<float> u = Matrix<float>.Build.DenseOfColumnArrays(new float[] { vert_i.x, vert_i.y, vert_i.z, 1 });
                 u__[i] = u;
-                //us[i] = u;
-                //Matrix<float> v;
-                //{
-                //    v = M[bw_i.boneIndex0].Multiply(bw_i.weight0).Multiply(u);
-                //    v = v.Add(M[bw_i.boneIndex1].Multiply(bw_i.weight1).Multiply(u));
-                //    v = v.Add(M[bw_i.boneIndex2].Multiply(bw_i.weight2).Multiply(u));
-                //    v = v.Add(M[bw_i.boneIndex3].Multiply(bw_i.weight3).Multiply(u));
-                //}
-                //vs_mat[i] = v;
                 u_.SetRow(i, u.Column(0));
-                //v_.SetRow(i, v.Column(0));
-                //vs[i] = new Vector3(v[0, 0], v[1, 0], v[2, 0]);
+                PROG__VALUE++;
             }
+            PROG__STAGE++;
             //_Smooth_vs_mat = IterativeCalcB(v_, iterations);
             //_Smooth_us = IterativeCalcB(u_, iterations);
         }
@@ -666,6 +693,7 @@ namespace DDM_Impl
             return B.Solve(IterativeCalcB(m, iteration));
         }
         Matrix<float> LaplacianMatrix;
+        int[] triangles;
         public void CalcuateNormalizedLaplace()
         {
             //BuildD();
@@ -684,8 +712,11 @@ namespace DDM_Impl
             //    LaplacianMatrix[i, i] = D[i];
 
             //}
-            var adj = MatrixUtils.BuildAdjacencyMatrix(Vertices, CurrentMesh.triangles, 32);
+            PROG__VALUE = 0;
+            var adj = MatrixUtils.BuildAdjacencyMatrix(Vertices, triangles, 32);
             normalizedLaplacian = LaplacianMatrix = MatrixUtils.BuildLaplacianMatrixFromAdjacentMatrix(Vertices.Length, adj, true);
+
+            PROG__STAGE++;
             return;
             AdjacencyMatrix _AdjacencyMatrix = AdjacencyMatrix.FromMesh(CurrentMesh);
             var deg = DegMatrix.FromMesh(CurrentMesh);
